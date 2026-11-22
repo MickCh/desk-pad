@@ -17,3 +17,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   (Ctrl+C, closing the console).
 - Digital mode of DragonRise pads is detected; buttons 1–4 are ignored
   while it lasts.
+- Configuration file `%APPDATA%\desk-pad\desk-pad.toml` (or
+  `--config PATH`), created with the documented defaults on first start and
+  reloaded when saved. Errors name the line; the previous settings stay
+  active.

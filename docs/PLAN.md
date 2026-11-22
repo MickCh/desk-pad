@@ -41,7 +41,7 @@ desk-pad.exe
 │    win::SendInputOutput: the real Output, through SendInput
 ├─ foreground watcher: active exe + window title → profile        (stage 4)
 ├─ tray icon, Win32 message loop                                  (stage 5)
-└─ config file watcher: reload on save                            (stage 3)
+└─ config file watcher: reload on save
 ```
 
 - **Timing.** REAPER's timer (~30/s) is too slow for a mouse. desk-pad runs
@@ -140,7 +140,9 @@ passthrough = true                   # reaper-pad has the pad: send nothing
   running Claude CLI was titled `circular-elephant | C:\Program
   Files\PowerShell\7\pwsh.EXE`, without "claude" in it. So `(?i)claude`
   alone is not enough: check the real titles with `--test` before choosing
-  the patterns, and expect to need the fallback below.
+  the patterns, and expect to need the fallback below. In a later session
+  the same tab was `erudite-aardvark | …`: the first part changes from
+  session to session, so it can't be matched either.
 - **Fallback when a CLI doesn't set a useful title:** a fixed tab title in the
   Windows Terminal profile (`"tabTitle"` + `"suppressApplicationTitle": true`),
   or `profile:cycle` on a button.
@@ -173,11 +175,19 @@ passthrough = true                   # reaper-pad has the pad: send nothing
   tuning the default speeds on the real pad.
 
 ### Stage 3: configuration
-- [ ] `desk-pad.toml` in `%APPDATA%\desk-pad\`, the documented default
-  embedded in the exe and written on first start (as in reaper-pad).
-- [ ] Validation with line numbers (`deny_unknown_fields`, unknown actions
-  and key names listed).
-- [ ] Reload on save (file watcher); on an error, the previous settings stay.
+- [x] `desk-pad.toml` in `%APPDATA%\desk-pad\` (or `--config PATH`), the
+  documented default (`config.toml`) embedded in the exe and written on
+  first start (as in reaper-pad).
+- [x] Validation with line numbers (`deny_unknown_fields`, unknown actions
+  and key names listed, button numbers, value ranges).
+- [x] Reload on save; on an error, the previous settings stay. Done by
+  polling the file's time and size every 250 ms and reading it once it
+  stopped changing, instead of a `notify` watcher: no dependency, and
+  editors that save by replacing the file are handled the same way.
+- [x] Format ready for stage 4: hardware (`[sticks.*]`) and speeds
+  (`[mouse]`, `[scroll]`) are global, bindings live in
+  `[profiles.default]`; other profiles are refused with a clear message
+  until then.
 
 ### Stage 4: profiles and layers
 - [ ] Active exe and window title (`SetWinEventHook`: foreground and name

@@ -7,11 +7,13 @@ scroll with the other, switch windows, mute yourself in Teams.
 A sibling of [reaper-pad](../reaper-pad), which turns the same pad into a
 remote control for REAPER; both share the gamepad code in `pad-core`.
 
-**Status:** early development (stages 1–2 of [the plan](docs/PLAN.md)). The
-layout is built in; the configuration file, per-application profiles and
-the tray icon come next.
+**Status:** early development (stages 1–3 of [the plan](docs/PLAN.md)).
+Per-application profiles and the tray icon come next.
 
 ## Default layout
+
+The layout below is the default configuration; see
+[Configuration](#configuration) to change it.
 
 Made for the **Art AG-16T** (a generic DragonRise twin-stick pad); button
 numbers match its printed labels.
@@ -53,7 +55,49 @@ desk-pad --test     button test: print buttons (with timing), axes, D-pad
                     and the window in front (program and title); sends nothing
 desk-pad --test --seconds 15
                     the same, ending by itself after 15 s
+desk-pad --config PATH
+                    use another configuration file
 ```
+
+## Configuration
+
+On first start desk-pad writes the default configuration to
+`%APPDATA%\desk-pad\desk-pad.toml`. Edit and save it: desk-pad reloads it
+within about a second. If the file has an error, the console names the line
+and the problem, and the previous settings stay active.
+
+The [default `config.toml`](config.toml) documents every option. In short:
+
+```toml
+[pad]
+debounce_ms = 120
+
+[sticks.left]               # hardware: axes and dead zone
+axis_x = 0
+axis_y = 1
+deadzone = 0.15
+
+[mouse]                     # pixels per second at slight / full deflection
+min_speed = 60
+max_speed = 1600
+
+[profiles.default.buttons]
+1 = "mouse:left"
+3 = "key:esc"
+7 = "key:alt+v"             # e.g. paste an image in Claude CLI
+10 = "pad:toggle"
+
+[profiles.default.dpad]
+right = "key:ctrl+tab"
+
+[profiles.default.sticks]
+left = "mouse"
+right = "scroll"
+```
+
+**Actions:** `key:<keys>` (e.g. `key:ctrl+shift+tab`, `key:f5`; held as long
+as the button), `mouse:left|right|middle|back|forward`, `pad:toggle`.
+**Sticks:** `mouse`, `scroll`, `none`.
 
 Windows does not let a normal program send input to windows of programs
 running as administrator: run desk-pad as administrator too if you need that.
@@ -77,7 +121,10 @@ cargo fmt --all
 ```
 src/main.rs        command line, the input loop
 src/router.rs      what the input means: keys, mouse, scroll, pause, test mode
-src/layout.rs      bindings (built in for now)
+src/config.rs      configuration file: parsing, validation, defaults
+src/watch.rs       notices when the configuration file was saved
+src/layout.rs      bindings and settings in effect
+config.toml        documented default configuration (embedded into the exe)
 src/action.rs      bindable actions (key:, mouse:, pad:toggle)
 src/keys.rs        key names and chords → Windows virtual-key codes
 src/win/           Win32: SendInput, the window in front, timer, Ctrl+C
