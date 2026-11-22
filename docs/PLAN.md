@@ -89,6 +89,11 @@ dpad.right = "key:win+ctrl+right"
 match = ["WindowsTerminal.exe"]
 inherit = "default"
 buttons.11 = "key:shift+tab"
+# zellij runs inside Windows Terminal and switches its tabs with Alt+←/→
+# (buttons 7/8 of the default profile already send these). Undecided:
+# D-pad ←→ for zellij tabs here, Windows Terminal tabs on a layer.
+# dpad.left  = "key:alt+left"
+# dpad.right = "key:alt+right"
 [profiles.terminal.layers.nav]
 dpad.left  = "key:alt+left"          # move focus between panes
 dpad.right = "key:alt+right"
@@ -168,13 +173,15 @@ passthrough = true                   # reaper-pad has the pad: send nothing
 - [x] `--test`: prints buttons, axes, D-pad, and the active exe and window
   title (to write `match` / `title` patterns).
 - [x] Safe exit: keys released on Ctrl+C / console close / pause / unplug.
-- [ ] Manual check: D-pad switches tabs in Chrome/Edge and Windows Terminal.
+- [x] Manual check: D-pad switches tabs in the browser and Windows Terminal
+  (2026-11-22).
 
 ### Stage 2: mouse and scroll
 - [x] Left stick: mouse (radial dead zone, curve, sub-pixel steps).
 - [x] Right stick: smooth vertical and horizontal scroll.
-- [ ] Manual check: selecting text in Windows Terminal with button 1 held;
-  tuning the default speeds on the real pad.
+- [x] Manual check: the default pointer and scroll speeds are fine on the
+  real pad (2026-11-22).
+- [ ] Manual check: selecting text in Windows Terminal with button 1 held.
 
 ### Stage 3: configuration
 - [x] `desk-pad.toml` in `%APPDATA%\desk-pad\` (or `--config PATH`), the
