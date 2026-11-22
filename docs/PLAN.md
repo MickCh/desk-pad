@@ -10,7 +10,7 @@ Tick an item off (`[x]`) in the same commit that does it.
 
 ## Shared code: `pad-core`
 
-The input code is shared with [reaper-pad](../../reaper-pad) through the
+The input code is shared with [reaper-pad](https://github.com/MickCh/reaper-pad) through the
 `pad-core` crate, a workspace member of the reaper-pad repository:
 
 | `pad-core` module | What it gives desk-pad |
@@ -22,10 +22,8 @@ The input code is shared with [reaper-pad](../../reaper-pad) through the
 Not shared (REAPER-specific, or only the pattern is reused): reaper-pad's
 router, commands, config, guard and REAPER glue.
 
-**Dependency:** for now a local path, `../reaper-pad/crates/pad-core`, so
-reaper-pad must be checked out next to desk-pad, on a branch that has
-`crates/pad-core` (currently the local branch `pad-core`). Once that is
-merged and pushed, switch to a git dependency pinned to a tag:
+**Dependency:** a git dependency pinned to a tag (`pad-core-v*` tags in
+reaper-pad; reaper-pad's own releases are `v*`):
 
 ```toml
 pad-core = { git = "https://github.com/MickCh/reaper-pad", tag = "pad-core-v0.1.0" }
@@ -149,11 +147,11 @@ passthrough = true                   # reaper-pad has the pad: send nothing
 - [x] Workspace with `crates/pad-core` (gamepad, input, logic).
 - [x] Generic `Stepper<K>`; `InputEvent::ButtonUp`.
 - [x] reaper-pad behaves as before: 50 unit tests, clippy, release build.
-- [x] Manual check in REAPER ([manual-tests.md](../../reaper-pad/docs/manual-tests.md)),
+- [x] Manual check in REAPER ([manual-tests.md](https://github.com/MickCh/reaper-pad/blob/main/docs/manual-tests.md)),
   2026-11-22 on Windows 11: buttons, sticks, replugging (digital-mode
   warning after reconnecting, as the pad falls back to digital mode).
-- [ ] Merge into reaper-pad `main`, tag `pad-core-v0.1.0`, push; switch
-  desk-pad to the git dependency.
+- [x] Merged into reaper-pad `main`, tagged `pad-core-v0.1.0`, pushed;
+  desk-pad uses the git dependency.
 
 ### Stage 1: skeleton
 - [x] Input loop at ~250 Hz, `Output` trait, `SendInput` output.
@@ -239,8 +237,9 @@ passthrough = true                   # reaper-pad has the pad: send nothing
   changes; the current layer in the tooltip (stage 4).
 
 ### Stage 6: release
-- [ ] CI (windows-latest): fmt, clippy, tests.
-- [ ] Release `desk-pad.exe` from a `v*` tag.
+- [x] CI (windows-latest): fmt, clippy, tests; MSRV check.
+- [x] Release workflow: a `v*` tag builds `desk-pad.exe` and a zip with
+  the README, the default configuration and the license.
 - [ ] README with the default profiles and troubleshooting.
 
 ## Known limits

@@ -1,0 +1,36 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Test
+        run: cargo test --release
+      - name: Build
+        run: cargo build --release
+      - name: Package
+        shell: pwsh
+        run: |
+          $name = "desk-pad-$env:GITHUB_REF_NAME-windows-x86_64"
+          New-Item -ItemType Directory -Force -Path "dist\$name" | Out-Null
+          Copy-Item target\release\desk-pad.exe dist\desk-pad.exe
+          Copy-Item dist\desk-pad.exe, config.toml, README.md, CHANGELOG.md, LICENSE "dist\$name\"
+          Compress-Archive -Path "dist\$name" -DestinationPath "dist\$name.zip"
+          Remove-Item -Recurse "dist\$name"
+      - uses: softprops/action-gh-release@v3
+        with:
+          files: dist/*
+          generate_release_notes: true

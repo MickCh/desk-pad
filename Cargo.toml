@@ -5,12 +5,12 @@ version = "0.1.0"
 edition = "2024"
 rust-version = "1.88"
 license = "MIT"
+repository = "https://github.com/MickCh/desk-pad"
 publish = false
 
 [dependencies]
-# Shared with reaper-pad. A local path for now; later a git dependency on
-# the reaper-pad repository.
-pad-core = { path = "../reaper-pad/crates/pad-core" }
+# Gamepad input, shared with reaper-pad (a crate in its repository).
+pad-core = { git = "https://github.com/MickCh/reaper-pad", tag = "pad-core-v0.1.0" }
 serde = { version = "1.0.229", features = ["derive"] }
 toml = "1.2.1"
 windows-sys = { version = "0.61.2", features = [

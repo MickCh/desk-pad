@@ -4,7 +4,7 @@ Use a cheap USB gamepad as keyboard and mouse on the Windows desktop: switch
 tabs in Windows Terminal and the browser, move the pointer with one stick,
 scroll with the other, switch windows, mute yourself in Teams.
 
-A sibling of [reaper-pad](../reaper-pad), which turns the same pad into a
+A sibling of [reaper-pad](https://github.com/MickCh/reaper-pad), which turns the same pad into a
 remote control for REAPER; both share the gamepad code in `pad-core`.
 
 **Status:** early development (stages 1–5 of [the plan](docs/PLAN.md), with
@@ -54,7 +54,11 @@ ignores buttons 1–4 until then.
 
 ## Installation
 
-From source (see [Building](#building)), in PowerShell:
+Download `desk-pad-<version>-windows-x86_64.zip` from
+[Releases](https://github.com/MickCh/desk-pad/releases), unpack it anywhere
+(e.g. `%LOCALAPPDATA%\Programs\desk-pad`) and start `desk-pad.exe`.
+
+Or from source (see [Building](#building)), in PowerShell:
 
 ```powershell
 .\install.ps1      # builds and copies desk-pad.exe to %LOCALAPPDATA%\Programs\desk-pad
@@ -96,7 +100,7 @@ Only one desk-pad runs at a time. Quit it from the tray before a `--test`,
 or it acts on the pad too.
 
 In REAPER, desk-pad sends nothing (`[profiles.reaper]` with
-`passthrough = true`): there [reaper-pad](../reaper-pad) has the pad.
+`passthrough = true`): there [reaper-pad](https://github.com/MickCh/reaper-pad) has the pad.
 
 ## Configuration
 
@@ -144,9 +148,9 @@ running as administrator: run desk-pad as administrator too if you need that.
 ## Building
 
 Requirements: Rust 1.88+, Visual Studio C++ build tools, CMake (SDL2 is
-built from source and linked statically). [reaper-pad](../reaper-pad) must
-be checked out next to this repository, on a branch with `crates/pad-core`:
-desk-pad uses it by path for now.
+built from source and linked statically). The gamepad code, `pad-core`, comes
+from the [reaper-pad](https://github.com/MickCh/reaper-pad) repository (a git dependency pinned
+to a tag); Cargo fetches it.
 
 ```sh
 cargo build --release      # target\release\desk-pad.exe
