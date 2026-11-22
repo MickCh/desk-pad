@@ -31,4 +31,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   the log goes to `%APPDATA%\desk-pad\desk-pad.log`. `--console` runs in a
   console as before; `--test` opens a console of its own.
 - Only one desk-pad runs at a time.
+- Layers (`layer:<name>`): other bindings while a button is held, with
+  `hold` keys and a `tap` action. Button 9 is now a window switcher when
+  held with the D-pad (Alt+Tab) and task view when tapped.
+- Actions `text:` (type text), `run:` (start a program, open a file or
+  URL) and `none` (unbind an inherited binding).
+- Default profile for Microsoft Teams: 5 mutes, 6 toggles the camera.
 - `install.ps1` installs to `%LOCALAPPDATA%\Programs\desk-pad`.

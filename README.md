@@ -27,7 +27,7 @@ numbers match its printed labels.
 | **5** | Paste an image in Claude CLI (Alt+V) |
 | **6** | Paste an image in Devin CLI (Shift+Insert; elsewhere a normal paste) |
 | **7 / 8** | Back / forward (Alt+← / Alt+→); previous / next tab in zellij |
-| **9** | Task view (Win+Tab) |
+| **9** | Held + D-pad: switch windows (Alt+Tab; release 9 to choose). Tapped: task view (Win+Tab) |
 | **10** | Pause / resume the pad |
 | **11** (left stick click) | Middle mouse button |
 | **12** (right stick click) | Mute the microphone in calls (Win+Alt+K) |
@@ -35,6 +35,9 @@ numbers match its printed labels.
 | **D-pad ↑ ↓** | Arrow up / down |
 | **Left stick** | Mouse pointer (a slight push moves slowly) |
 | **Right stick** | Scroll, vertical and horizontal |
+
+In Microsoft Teams, **5** mutes / unmutes (Ctrl+Shift+M) and **6** turns
+the camera on / off (Ctrl+Shift+O).
 
 The D-pad repeats while held. Keys and mouse buttons stay down as long as
 the pad's button. When the pad is paused or unplugged, or desk-pad stops,

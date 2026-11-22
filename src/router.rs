@@ -5,8 +5,8 @@
 //! its output through `SendInput`.
 
 use crate::action::{Action, MouseButton};
-use crate::keys::{self, Vk};
-use crate::layout::{Layout, Stick, StickRole};
+use crate::keys::{self, Chord, Vk};
+use crate::layout::{Dpad, Layer, Layout, Stick, StickRole};
 use pad_core::input::{Device, InputEvent, Log, hat_name};
 use pad_core::logic::{Debouncer, Direction, Directions, HatRepeat, ModeDetector, Stepper};
 use std::collections::HashMap;
@@ -21,6 +21,21 @@ pub trait Output: Log {
     /// Wheel movement in wheel units (120 = one notch); `vertical` > 0
     /// scrolls up, `horizontal` > 0 scrolls right.
     fn wheel(&mut self, vertical: i32, horizontal: i32);
+    /// Type `text` (`\n` as Enter, `\t` as Tab).
+    fn text(&mut self, text: &str);
+    /// Start a program, or open a file, folder or URL (`run:`).
+    fn run(&mut self, command: &str);
+}
+
+/// A `layer:` button being held.
+#[derive(Debug)]
+struct ActiveLayer {
+    button: u32,
+    name: String,
+    /// A binding was used while it was held: no `tap` on release.
+    used: bool,
+    /// Its `hold` keys are down.
+    holding: bool,
 }
 
 /// Wheel units per notch (`WHEEL_DELTA`).
@@ -108,6 +123,8 @@ pub struct Router {
     /// bounce back first (a worn contact must not end a drag).
     releasing: HashMap<u32, Instant>,
     held: Held,
+    /// Layers whose buttons are held, the newest (in effect) last.
+    layers: Vec<ActiveLayer>,
     /// Fractional pixels and wheel units, by (stick, axis).
     steps: Stepper<(u8, u8)>,
     /// Test mode: when each button was last pressed and released.
@@ -129,6 +146,7 @@ impl Router {
             pressed: HashMap::new(),
             releasing: HashMap::new(),
             held: Held::default(),
+            layers: Vec::new(),
             steps: Stepper::default(),
             test_times: HashMap::new(),
             last_tick: now,
@@ -207,6 +225,7 @@ impl Router {
 
     /// Release every key and mouse button held for the pad.
     pub fn release_all(&mut self, out: &mut dyn Output) {
+        self.layers.clear(); // their hold keys are released with the rest
         self.pressed.clear();
         self.releasing.clear();
         self.held.release_all(out);
@@ -279,7 +298,7 @@ impl Router {
             ));
             return;
         }
-        let Some(action) = self.layout.buttons.get(&num).cloned() else {
+        let Some((action, own)) = self.binding(num) else {
             out.log(&format!("[{num}] (not assigned)"));
             return;
         };
@@ -292,9 +311,105 @@ impl Router {
         }
         out.log(&format!("[{num}] {action}"));
         if let Some(old) = self.pressed.insert(num, action.clone()) {
-            self.release(&old, out); // a lost release event
+            self.let_go(num, &old, out); // a lost release event
         }
+        if let Action::Layer(name) = action {
+            self.layers.push(ActiveLayer {
+                button: num,
+                name,
+                used: false,
+                holding: false,
+            });
+            return;
+        }
+        self.use_layer(own, out);
         self.press(&action, out);
+    }
+
+    /// The layer in effect, if a layer button is held.
+    fn layer(&self) -> Option<&Layer> {
+        self.layers
+            .last()
+            .and_then(|a| self.layout.layers.get(&a.name))
+    }
+
+    /// What button `num` does now: from the layer in effect, else from the
+    /// profile; with whether it came from the layer.
+    fn binding(&self, num: u32) -> Option<(Action, bool)> {
+        let (action, own) = match self.layer().and_then(|l| l.buttons.get(&num)) {
+            Some(a) => (a, true),
+            None => (self.layout.buttons.get(&num)?, false),
+        };
+        (*action != Action::None).then(|| (action.clone(), own))
+    }
+
+    /// What a D-pad direction does now (as [`Self::binding`]).
+    fn dpad_binding(&self, dir: Direction) -> Option<(Action, bool)> {
+        let pick = |d: &Dpad| match dir {
+            Direction::Up => d.up.clone(),
+            Direction::Down => d.down.clone(),
+            Direction::Left => d.left.clone(),
+            Direction::Right => d.right.clone(),
+        };
+        let (action, own) = match self.layer().and_then(|l| pick(&l.dpad)) {
+            Some(a) => (a, true),
+            None => (pick(&self.layout.dpad)?, false),
+        };
+        (action != Action::None).then_some((action, own))
+    }
+
+    /// A binding is used while a layer is held: no `tap` for it, and if
+    /// the binding is the layer's own, its `hold` keys go down (once).
+    fn use_layer(&mut self, own: bool, out: &mut dyn Output) {
+        let Some(active) = self.layers.last_mut() else {
+            return;
+        };
+        active.used = true;
+        if !own || active.holding {
+            return;
+        }
+        active.holding = true;
+        let hold = self
+            .layout
+            .layers
+            .get(&active.name)
+            .and_then(|l| l.hold.clone());
+        for k in hold.iter().flat_map(Chord::keys) {
+            self.held.key(k, true, out);
+        }
+    }
+
+    /// The layer of button `num` ends: its `hold` keys go up, or, if it
+    /// was not used, its `tap` is sent.
+    fn end_layer(&mut self, num: u32, out: &mut dyn Output) {
+        let Some(i) = self.layers.iter().position(|a| a.button == num) else {
+            return;
+        };
+        let active = self.layers.remove(i);
+        let Some(layer) = self.layout.layers.get(&active.name).cloned() else {
+            return;
+        };
+        if active.holding {
+            for k in layer.hold.iter().flat_map(|c| c.keys().rev()) {
+                self.held.key(k, false, out);
+            }
+        }
+        if !active.used
+            && let Some(tap) = layer.tap
+        {
+            out.log(&format!("[{num}] {tap}"));
+            self.press(&tap, out);
+            self.release(&tap, out);
+        }
+    }
+
+    /// Release what button `num` pressed.
+    fn let_go(&mut self, num: u32, action: &Action, out: &mut dyn Output) {
+        if matches!(action, Action::Layer(_)) {
+            self.end_layer(num, out);
+        } else {
+            self.release(action, out);
+        }
     }
 
     fn button_up(&mut self, num: u32, now: Instant, out: &mut dyn Output) {
@@ -324,7 +439,7 @@ impl Router {
 
     fn finish_release(&mut self, num: u32, out: &mut dyn Output) {
         if let Some(action) = self.pressed.remove(&num) {
-            self.release(&action, out);
+            self.let_go(num, &action, out);
         }
     }
 
@@ -343,16 +458,10 @@ impl Router {
             return;
         }
         for dir in dirs {
-            let d = &self.layout.dpad;
-            let action = match dir {
-                Direction::Up => &d.up,
-                Direction::Down => &d.down,
-                Direction::Left => &d.left,
-                Direction::Right => &d.right,
-            };
-            match action.clone() {
-                Some(Action::PadToggle) => self.set_paused(true, out),
-                Some(a) => {
+            match self.dpad_binding(dir) {
+                Some((Action::PadToggle, _)) => self.set_paused(true, out),
+                Some((a, own)) => {
+                    self.use_layer(own, out);
                     self.press(&a, out);
                     self.release(&a, out);
                 }
@@ -369,7 +478,9 @@ impl Router {
                 }
             }
             Action::Mouse(b) => self.held.mouse(*b, true, out),
-            Action::PadToggle => {}
+            Action::Text(t) => out.text(t),
+            Action::Run(c) => out.run(c),
+            Action::PadToggle | Action::Layer(_) | Action::None => {}
         }
     }
 
@@ -381,7 +492,11 @@ impl Router {
                 }
             }
             Action::Mouse(b) => self.held.mouse(*b, false, out),
-            Action::PadToggle => {}
+            Action::Text(_)
+            | Action::Run(_)
+            | Action::PadToggle
+            | Action::Layer(_)
+            | Action::None => {}
         }
     }
 
@@ -499,6 +614,8 @@ mod tests {
         Mouse(MouseButton, bool),
         Move(i32, i32),
         Wheel(i32, i32),
+        Text(String),
+        Run(String),
         Log(String),
     }
 
@@ -563,6 +680,12 @@ mod tests {
         }
         fn wheel(&mut self, vertical: i32, horizontal: i32) {
             self.0.push(Out::Wheel(vertical, horizontal));
+        }
+        fn text(&mut self, text: &str) {
+            self.0.push(Out::Text(text.into()));
+        }
+        fn run(&mut self, command: &str) {
+            self.0.push(Out::Run(command.into()));
         }
     }
 
@@ -858,6 +981,103 @@ mod tests {
             "25 notches/s = 3000 units/s, got {v}"
         );
         assert_eq!(h, 0);
+    }
+
+    /// Press button `num` (as printed) at `t` and release it 50 ms later,
+    /// letting the debounce window pass.
+    fn click(r: &mut Router, num: u8, t: Instant, out: &mut TestOut) {
+        r.event(Button(num - 1), t, out);
+        r.event(ButtonUp(num - 1), t + ms(50), out);
+        r.tick(t + ms(200), no_axes, out);
+    }
+
+    #[test]
+    fn window_switcher_layer() {
+        let t0 = Instant::now();
+        let mut r = router(t0);
+        let mut out = TestOut::default();
+        r.event(Button(8), t0, &mut out); // button 9: layer:windows
+        assert!(out.sent().is_empty(), "alt only once the layer is used");
+        r.event(Hat((1, 0)), t0 + ms(100), &mut out);
+        r.event(Hat((0, 0)), t0 + ms(150), &mut out);
+        r.event(Hat((1, 0)), t0 + ms(200), &mut out);
+        r.event(Hat((0, 0)), t0 + ms(250), &mut out);
+        r.event(ButtonUp(8), t0 + ms(400), &mut out);
+        r.tick(t0 + ms(600), no_axes, &mut out);
+        let tab = [Out::Key("tab", true), Out::Key("tab", false)];
+        let mut expected = vec![Out::Key("alt", true)];
+        expected.extend(tab.clone());
+        expected.extend(tab);
+        expected.push(Out::Key("alt", false));
+        assert_eq!(out.sent(), expected);
+        assert!(r.held.is_empty());
+        assert!(r.idle());
+        // Back to the profile's D-pad.
+        r.event(Hat((1, 0)), t0 + ms(700), &mut out);
+        assert_eq!(out.sent().last(), Some(&Out::Key("ctrl", false)));
+    }
+
+    #[test]
+    fn unused_layer_sends_its_tap() {
+        let t0 = Instant::now();
+        let mut r = router(t0);
+        let mut out = TestOut::default();
+        click(&mut r, 9, t0, &mut out);
+        assert_eq!(
+            out.sent(),
+            vec![
+                Out::Key("win", true),
+                Out::Key("tab", true),
+                Out::Key("tab", false),
+                Out::Key("win", false)
+            ]
+        );
+    }
+
+    #[test]
+    fn layer_falls_through_and_none_unbinds() {
+        let t0 = Instant::now();
+        let mut l = layout();
+        let layer = l.layers.get_mut("windows").unwrap();
+        layer.buttons.insert(3, "none".parse().unwrap());
+        layer.buttons.insert(4, "text:hi\n".parse().unwrap());
+        let mut r = Router::new(l, t0);
+        r.connected(Device { dragonrise: false });
+        let mut out = TestOut::default();
+        r.event(Button(8), t0, &mut out); // layer held
+        click(&mut r, 1, t0 + ms(10), &mut out); // not in the layer: mouse:left
+        click(&mut r, 3, t0 + ms(300), &mut out); // "none" in the layer
+        click(&mut r, 4, t0 + ms(600), &mut out); // the layer's own: alt first
+        r.event(ButtonUp(8), t0 + ms(900), &mut out);
+        r.tick(t0 + ms(1100), no_axes, &mut out);
+        assert_eq!(
+            out.sent(),
+            vec![
+                Out::Mouse(MouseButton::Left, true),
+                Out::Mouse(MouseButton::Left, false),
+                Out::Key("alt", true),
+                Out::Text("hi\n".into()),
+                Out::Key("alt", false),
+            ],
+            "no tap: the layer was used"
+        );
+    }
+
+    #[test]
+    fn text_and_run_happen_on_press() {
+        let t0 = Instant::now();
+        let mut l = layout();
+        l.buttons.insert(3, "text:/clear\n".parse().unwrap());
+        l.dpad.up = Some("run:notepad.exe".parse().unwrap());
+        let mut r = Router::new(l, t0);
+        r.connected(Device { dragonrise: false });
+        let mut out = TestOut::default();
+        click(&mut r, 3, t0, &mut out);
+        r.event(Hat((0, 1)), t0 + ms(300), &mut out);
+        assert_eq!(
+            out.sent(),
+            vec![Out::Text("/clear\n".into()), Out::Run("notepad.exe".into())]
+        );
     }
 
     #[test]

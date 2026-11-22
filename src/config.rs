@@ -2,6 +2,7 @@
 //! `config.toml` in the repository root for the documented default.
 
 use crate::action::Action;
+use crate::keys::Chord;
 use crate::layout::{Dpad, Layout, Stick, StickRole};
 use serde::Deserialize;
 use std::collections::{BTreeMap, HashMap};
@@ -136,9 +137,20 @@ struct RawProfile {
     buttons: HashMap<ButtonNum, Action>,
     dpad: RawDpad,
     sticks: RawRoles,
+    layers: BTreeMap<String, RawLayer>,
 }
 
 #[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields, default)]
+struct RawLayer {
+    /// Keys, e.g. `alt`.
+    hold: Option<String>,
+    tap: Option<Action>,
+    buttons: HashMap<ButtonNum, Action>,
+    dpad: RawDpad,
+}
+
+#[derive(Debug, Default, Clone, Deserialize)]
 #[serde(deny_unknown_fields, default)]
 struct RawDpad {
     up: Option<Action>,
@@ -160,6 +172,17 @@ enum RawRole {
     Mouse,
     Scroll,
     None,
+}
+
+impl RawDpad {
+    fn dpad(&self) -> Dpad {
+        Dpad {
+            up: self.up.clone(),
+            down: self.down.clone(),
+            left: self.left.clone(),
+            right: self.right.clone(),
+        }
+    }
 }
 
 impl RawRole {
@@ -276,22 +299,59 @@ impl Base {
     }
 
     /// A profile's layout: its bindings over those of `parent` (the default
-    /// profile), if any.
-    fn layout(&self, p: &RawProfile, parent: Option<&Layout>) -> Layout {
+    /// profile), if any. `none` removes an inherited binding.
+    fn layout(
+        &self,
+        name: &str,
+        p: &RawProfile,
+        parent: Option<&Layout>,
+    ) -> Result<Layout, ConfigError> {
         let mut buttons = parent.map(|l| l.buttons.clone()).unwrap_or_default();
         buttons.extend(p.buttons.iter().map(|(n, a)| (n.0, a.clone())));
-        let d = parent.map(|l| l.dpad.clone()).unwrap_or_default();
+        buttons.retain(|_, a| *a != Action::None);
+        let mut dpad = parent
+            .map(|l| l.dpad.clone())
+            .unwrap_or_default()
+            .merged(&p.dpad.dpad());
+        for d in [
+            &mut dpad.up,
+            &mut dpad.down,
+            &mut dpad.left,
+            &mut dpad.right,
+        ] {
+            if *d == Some(Action::None) {
+                *d = None;
+            }
+        }
+        let mut layers = parent.map(|l| l.layers.clone()).unwrap_or_default();
+        for (lname, raw) in &p.layers {
+            let at = format!("[profiles.{name}.layers.{lname}]");
+            let hold = match &raw.hold {
+                Some(h) => Some(
+                    h.parse::<Chord>()
+                        .map_err(|e| ConfigError::Invalid(format!("{at} hold = \"{h}\": {e}")))?,
+                ),
+                None => None,
+            };
+            let layer = layers.entry(lname.clone()).or_default();
+            layer
+                .buttons
+                .extend(raw.buttons.iter().map(|(n, a)| (n.0, a.clone())));
+            layer.dpad = layer.dpad.merged(&raw.dpad.dpad());
+            if hold.is_some() {
+                layer.hold = hold;
+            }
+            if raw.tap.is_some() {
+                layer.tap.clone_from(&raw.tap);
+            }
+        }
         let role = |raw: Option<RawRole>, inherited: Option<StickRole>| {
             raw.map_or(inherited, RawRole::role)
         };
-        Layout {
+        let layout = Layout {
             buttons,
-            dpad: Dpad {
-                up: p.dpad.up.clone().or(d.up),
-                down: p.dpad.down.clone().or(d.down),
-                left: p.dpad.left.clone().or(d.left),
-                right: p.dpad.right.clone().or(d.right),
-            },
+            dpad,
+            layers,
             repeat_ms: self.repeat_ms,
             debounce_ms: self.debounce_ms,
             detect_digital_mode: self.detect_digital_mode,
@@ -303,8 +363,42 @@ impl Base {
                 self.right,
                 role(p.sticks.right, parent.and_then(|l| l.right.role)),
             ),
+        };
+        check_layers(name, &layout)?;
+        Ok(layout)
+    }
+}
+
+/// `layer:` only on buttons of the profile itself, naming a layer it has.
+fn check_layers(profile: &str, l: &Layout) -> Result<(), ConfigError> {
+    let invalid = |msg: String| Err(ConfigError::Invalid(msg));
+    for (num, a) in &l.buttons {
+        if let Action::Layer(name) = a
+            && !l.layers.contains_key(name)
+        {
+            return invalid(format!(
+                "[profiles.{profile}] button {num} = \"{a}\": there is no [profiles.{profile}.layers.{name}]"
+            ));
         }
     }
+    if let Some(a) = l.dpad.iter().find(|a| matches!(a, Action::Layer(_))) {
+        return invalid(format!(
+            "[profiles.{profile}] dpad: \"{a}\" works on buttons only (a layer lasts while its button is held)"
+        ));
+    }
+    for (name, layer) in &l.layers {
+        let inner = layer
+            .buttons
+            .values()
+            .chain(layer.dpad.iter())
+            .chain(&layer.tap);
+        if let Some(a) = inner.into_iter().find(|a| matches!(a, Action::Layer(_))) {
+            return invalid(format!(
+                "[profiles.{profile}.layers.{name}]: \"{a}\" — layers cannot switch to other layers"
+            ));
+        }
+    }
+    Ok(())
 }
 
 impl RawProfile {
@@ -317,6 +411,7 @@ impl RawProfile {
             || d.right.is_some()
             || self.sticks.left.is_some()
             || self.sticks.right.is_some()
+            || !self.layers.is_empty()
     }
 }
 
@@ -334,7 +429,7 @@ pub fn parse(text: &str) -> Result<Profiles, ConfigError> {
              it takes no match or passthrough"
         ));
     }
-    let default = base.layout(&default_raw, None);
+    let default = base.layout(DEFAULT_PROFILE, &default_raw, None)?;
 
     let mut apps: Vec<AppProfile> = Vec::new();
     for (name, p) in &profiles {
@@ -360,10 +455,15 @@ pub fn parse(text: &str) -> Result<Profiles, ConfigError> {
                 ));
             }
         }
+        let layout = if p.passthrough {
+            None
+        } else {
+            Some(base.layout(name, p, Some(&default))?)
+        };
         apps.push(AppProfile {
             name: name.clone(),
             exes: p.matches.clone(),
-            layout: (!p.passthrough).then(|| base.layout(p, Some(&default))),
+            layout,
         });
     }
     Ok(Profiles { default, apps })
@@ -558,6 +658,62 @@ mod tests {
         assert!(e.contains("[profiles.default]"), "{e}");
         let e = err("[profiles.x]\nmatch = [\"x.exe\"]\ntitle = \"y\"");
         assert!(e.contains("title"), "unknown option: {e}");
+    }
+
+    #[test]
+    fn layers_merge_and_none_unbinds() {
+        let p = parse(
+            r#"
+            [profiles.default.buttons]
+            1 = "mouse:left"
+            9 = "layer:windows"
+            [profiles.default.dpad]
+            up = "key:up"
+            [profiles.default.layers.windows]
+            hold = "alt"
+            tap = "key:win+tab"
+            dpad.right = "key:tab"
+
+            [profiles.x]
+            match = ["x.exe"]
+            buttons.1 = "none"
+            dpad.up = "none"
+            layers.windows.dpad.left = "key:shift+tab"
+            "#,
+        )
+        .unwrap();
+        let w = &p.default.layers["windows"];
+        assert_eq!(w.hold, Some("alt".parse().unwrap()));
+        assert_eq!(w.tap, Some("key:win+tab".parse().unwrap()));
+        let x = p.select("x.exe").1.unwrap();
+        assert!(!x.buttons.contains_key(&1), "unbound");
+        assert_eq!(x.dpad.up, None);
+        let xw = &x.layers["windows"];
+        assert_eq!(xw.dpad.right, Some("key:tab".parse().unwrap()), "inherited");
+        assert_eq!(xw.dpad.left, Some("key:shift+tab".parse().unwrap()));
+        assert_eq!(xw.hold, w.hold);
+    }
+
+    #[test]
+    fn layers_are_checked() {
+        let e = err("[profiles.default.buttons]\n9 = \"layer:nope\"");
+        assert!(e.contains("no [profiles.default.layers.nope]"), "{e}");
+        let e = err("[profiles.default.dpad]\nup = \"layer:a\"\n[profiles.default.layers.a]");
+        assert!(e.contains("buttons only"), "{e}");
+        let e = err("[profiles.default.layers.a]\ntap = \"layer:a\"");
+        assert!(e.contains("cannot switch to other layers"), "{e}");
+        let e = err("[profiles.default.layers.a]\nhold = \"alt+\"");
+        assert!(e.contains("[profiles.default.layers.a] hold"), "{e}");
+    }
+
+    #[test]
+    fn teams_has_its_own_buttons() {
+        let p = parse(DEFAULT_CONFIG).unwrap();
+        let (name, l) = p.select("ms-teams.exe");
+        assert_eq!(name, "teams");
+        let l = l.unwrap();
+        assert_eq!(l.buttons[&5], "key:ctrl+shift+m".parse().unwrap());
+        assert_eq!(l.buttons[&9], "layer:windows".parse().unwrap(), "inherited");
     }
 
     #[test]

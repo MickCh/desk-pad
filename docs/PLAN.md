@@ -196,10 +196,25 @@ passthrough = true                   # reaper-pad has the pad: send nothing
   `[profiles.default]` (implicit inheritance). A switch waits until no pad
   button is held, so a drag or a held key ends where it started.
 - [x] `[profiles.reaper]` with `passthrough` in the default configuration.
-- [ ] `title` (regex), explicit `inherit`, `"none"` to unbind a button.
-- [ ] Layers (`layer:`), `switcher`, `profile:cycle`.
-- [ ] `text:`, `focus:` (with the Alt trick for `SetForegroundWindow`), `run:`.
-- [ ] Default profiles: terminal, browser, teams.
+- [x] `"none"` unbinds an inherited button, D-pad direction or layer
+  binding.
+- [x] Layers (`layer:<name>`): while the button is held, the layer's
+  bindings apply; what it doesn't bind falls through to the profile.
+  `hold` keys go down at the first use of the layer's own bindings and up
+  with its button; `tap` is sent if the layer was not used. That makes the
+  window switcher a layer: button 9, `hold = "alt"`, Tab / Shift+Tab on
+  the D-pad, `tap = "key:win+tab"` (so no separate `switcher` action).
+  App profiles inherit the default's layers and can extend them.
+- [x] `text:` (Unicode input, `\n` as Enter, independent of the keyboard
+  layout) and `run:` (`ShellExecute` on a thread of its own,
+  `%VARIABLES%` expanded).
+- [x] Default `teams` profile (5: mute, 6: camera). Terminal and browser
+  need no profile: the defaults (D-pad Ctrl+Tab, 7/8 Alt+←/→, which
+  switch zellij tabs too) work in both.
+- [ ] Manual check: the switcher on 9, Teams buttons.
+- [ ] Later, if needed: `focus:` (with the Alt trick for
+  `SetForegroundWindow`), `profile:cycle`, `title` (regex; zellij makes
+  terminal titles useless for telling CLIs apart), sticks in layers.
 
 ### Stage 5: tray and UX
 - [x] No console window (`windows_subsystem = "windows"`); log to

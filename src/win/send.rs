@@ -7,7 +7,7 @@ use pad_core::input::Log;
 use std::mem::size_of;
 use windows_sys::Win32::UI::Input::KeyboardAndMouse::{
     INPUT, INPUT_0, INPUT_KEYBOARD, INPUT_MOUSE, KEYBDINPUT, KEYEVENTF_EXTENDEDKEY,
-    KEYEVENTF_KEYUP, MAPVK_VK_TO_VSC_EX, MOUSE_EVENT_FLAGS, MOUSEEVENTF_HWHEEL,
+    KEYEVENTF_KEYUP, KEYEVENTF_UNICODE, MAPVK_VK_TO_VSC_EX, MOUSE_EVENT_FLAGS, MOUSEEVENTF_HWHEEL,
     MOUSEEVENTF_LEFTDOWN, MOUSEEVENTF_LEFTUP, MOUSEEVENTF_MIDDLEDOWN, MOUSEEVENTF_MIDDLEUP,
     MOUSEEVENTF_MOVE, MOUSEEVENTF_RIGHTDOWN, MOUSEEVENTF_RIGHTUP, MOUSEEVENTF_WHEEL,
     MOUSEEVENTF_XDOWN, MOUSEEVENTF_XUP, MOUSEINPUT, MapVirtualKeyW, SendInput,
@@ -158,5 +158,45 @@ impl<L: Log> Output for SendInputOutput<L> {
         if horizontal != 0 {
             self.mouse(MOUSEEVENTF_HWHEEL, 0, 0, horizontal);
         }
+    }
+
+    fn text(&mut self, text: &str) {
+        // Line ends and tabs as keys (terminals expect Enter, not a
+        // character); everything else as Unicode characters, independent
+        // of the keyboard layout.
+        for c in text.chars() {
+            match c {
+                '\r' => {}
+                '\n' | '\t' => {
+                    let vk = if c == '\n' { 0x0D } else { 0x09 }; // VK_RETURN, VK_TAB
+                    self.key(vk, true);
+                    self.key(vk, false);
+                }
+                c => {
+                    let mut units = [0u16; 2];
+                    for &unit in c.encode_utf16(&mut units).iter() {
+                        for up in [false, true] {
+                            self.send(INPUT {
+                                r#type: INPUT_KEYBOARD,
+                                Anonymous: INPUT_0 {
+                                    ki: KEYBDINPUT {
+                                        wVk: 0,
+                                        wScan: unit,
+                                        dwFlags: KEYEVENTF_UNICODE
+                                            | if up { KEYEVENTF_KEYUP } else { 0 },
+                                        time: 0,
+                                        dwExtraInfo: EXTRA_INFO,
+                                    },
+                                },
+                            });
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    fn run(&mut self, command: &str) {
+        super::shell::run(command);
     }
 }

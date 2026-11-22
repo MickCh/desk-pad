@@ -8,7 +8,7 @@
 //! of [`Command`]s back.
 
 use super::icon::{self, Icon};
-use super::{autostart, fill, wide};
+use super::{autostart, fill, shell, wide};
 use crate::app::{Look, Status};
 use crate::{logging, stop};
 use std::cell::Cell;
@@ -22,15 +22,15 @@ use windows_sys::Win32::Foundation::{HWND, LPARAM, LRESULT, POINT, WPARAM};
 use windows_sys::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows_sys::Win32::UI::Shell::{
     NIF_ICON, NIF_INFO, NIF_MESSAGE, NIF_TIP, NIIF_INFO, NIIF_NOSOUND, NIM_ADD, NIM_DELETE,
-    NIM_MODIFY, NOTIFYICONDATAW, Shell_NotifyIconW, ShellExecuteW,
+    NIM_MODIFY, NOTIFYICONDATAW, Shell_NotifyIconW,
 };
 use windows_sys::Win32::UI::WindowsAndMessaging::{
     AppendMenuW, CreatePopupMenu, CreateWindowExW, DefWindowProcW, DestroyMenu, DestroyWindow,
     DispatchMessageW, GWLP_USERDATA, GetCursorPos, GetMessageW, GetWindowLongPtrW, MF_CHECKED,
     MF_GRAYED, MF_SEPARATOR, MF_STRING, MSG, PostMessageW, PostQuitMessage, RegisterClassW,
-    RegisterWindowMessageW, SW_SHOWNORMAL, SetForegroundWindow, SetWindowLongPtrW, TPM_NONOTIFY,
-    TPM_RETURNCMD, TPM_RIGHTBUTTON, TrackPopupMenu, TranslateMessage, WM_APP, WM_DESTROY,
-    WM_ENDSESSION, WM_LBUTTONUP, WM_NULL, WM_RBUTTONUP, WNDCLASSW, WS_OVERLAPPED,
+    RegisterWindowMessageW, SetForegroundWindow, SetWindowLongPtrW, TPM_NONOTIFY, TPM_RETURNCMD,
+    TPM_RIGHTBUTTON, TrackPopupMenu, TranslateMessage, WM_APP, WM_DESTROY, WM_ENDSESSION,
+    WM_LBUTTONUP, WM_NULL, WM_RBUTTONUP, WNDCLASSW, WS_OVERLAPPED,
 };
 
 /// Requests from the tray menu to the input loop.
@@ -257,10 +257,10 @@ impl Tray {
             ID_RELOAD => {
                 let _ = self.commands.send(Command::Reload);
             }
-            ID_CONFIG => open(&self.paths.config),
+            ID_CONFIG => shell::open(&self.paths.config),
             ID_LOG => {
                 if let Some(log) = &self.paths.log {
-                    open(log);
+                    shell::open(log);
                 }
             }
             ID_AUTOSTART => match autostart::set(!autostart_on, &self.paths.autostart_args) {
@@ -287,35 +287,6 @@ fn shorten(msg: &str, max: usize) -> String {
     }
     let cut: String = msg.chars().take(max.saturating_sub(20)).collect();
     format!("{cut}… (see the log)")
-}
-
-/// Open a file with its program, or Notepad if it has none.
-fn open(path: &std::path::Path) {
-    let file = wide(&path.display().to_string());
-    let verb = wide("open");
-    // SAFETY: all strings are NUL-terminated and outlive the calls.
-    unsafe {
-        let r = ShellExecuteW(
-            null_mut(),
-            verb.as_ptr(),
-            file.as_ptr(),
-            null(),
-            null(),
-            SW_SHOWNORMAL,
-        );
-        if (r as isize) <= 32 {
-            let notepad = wide("notepad.exe");
-            let arg = wide(&format!("\"{}\"", path.display()));
-            ShellExecuteW(
-                null_mut(),
-                verb.as_ptr(),
-                notepad.as_ptr(),
-                arg.as_ptr(),
-                null(),
-                SW_SHOWNORMAL,
-            );
-        }
-    }
 }
 
 unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {

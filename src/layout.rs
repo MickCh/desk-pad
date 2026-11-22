@@ -2,6 +2,7 @@
 //! file by [`crate::config`].
 
 use crate::action::Action;
+use crate::keys::Chord;
 use pad_core::logic::AxisParams;
 use std::collections::HashMap;
 
@@ -51,11 +52,45 @@ pub struct Dpad {
     pub right: Option<Action>,
 }
 
+impl Dpad {
+    /// Each direction of `over` that is set, else that of `self`.
+    pub fn merged(&self, over: &Dpad) -> Dpad {
+        let pick = |o: &Option<Action>, s: &Option<Action>| o.clone().or_else(|| s.clone());
+        Dpad {
+            up: pick(&over.up, &self.up),
+            down: pick(&over.down, &self.down),
+            left: pick(&over.left, &self.left),
+            right: pick(&over.right, &self.right),
+        }
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = &Action> {
+        [&self.up, &self.down, &self.left, &self.right]
+            .into_iter()
+            .flatten()
+    }
+}
+
+/// Bindings in effect while a `layer:` button is held. What a layer does
+/// not bind comes from the profile.
+#[derive(Debug, Clone, Default)]
+pub struct Layer {
+    pub buttons: HashMap<u32, Action>,
+    pub dpad: Dpad,
+    /// Keys held down from the first use of the layer's own bindings until
+    /// its button is released: `alt` with `tab` on the D-pad is a window
+    /// switcher.
+    pub hold: Option<Chord>,
+    /// Sent when the layer button is released without having been used.
+    pub tap: Option<Action>,
+}
+
 #[derive(Debug, Clone)]
 pub struct Layout {
     /// By the number printed on the pad (hardware index + 1).
     pub buttons: HashMap<u32, Action>,
     pub dpad: Dpad,
+    pub layers: HashMap<String, Layer>,
     /// D-pad auto-repeat interval while held.
     pub repeat_ms: u64,
     /// Ignore contact bounce of worn buttons.
@@ -86,5 +121,6 @@ mod tests {
         let l = Layout::default();
         assert_eq!(l.buttons[&10], Action::PadToggle);
         assert_eq!(l.buttons.len(), 12);
+        assert!(l.layers.contains_key("windows"));
     }
 }

@@ -7,6 +7,7 @@ pub mod console;
 pub mod foreground;
 pub mod icon;
 pub mod send;
+pub mod shell;
 pub mod tray;
 
 use std::ptr::null_mut;
