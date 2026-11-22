@@ -155,7 +155,9 @@ passthrough = true                   # reaper-pad has the pad: send nothing
 - [x] Workspace with `crates/pad-core` (gamepad, input, logic).
 - [x] Generic `Stepper<K>`; `InputEvent::ButtonUp`.
 - [x] reaper-pad behaves as before: 50 unit tests, clippy, release build.
-- [ ] Manual check in REAPER ([manual-tests.md](../../reaper-pad/docs/manual-tests.md)).
+- [x] Manual check in REAPER ([manual-tests.md](../../reaper-pad/docs/manual-tests.md)),
+  2026-11-22 on Windows 11: buttons, sticks, replugging (digital-mode
+  warning after reconnecting, as the pad falls back to digital mode).
 - [ ] Merge into reaper-pad `main`, tag `pad-core-v0.1.0`, push; switch
   desk-pad to the git dependency.
 
