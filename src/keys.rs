@@ -95,9 +95,17 @@ pub fn vk(name: &str) -> Option<Vk> {
         .map(|&(_, vk)| vk)
 }
 
-/// Whether `vk` is one of the modifiers (ctrl, shift, alt, win).
-pub fn is_modifier(vk: Vk) -> bool {
+fn is_modifier(vk: Vk) -> bool {
     MODIFIERS.iter().any(|&(_, m)| m == vk)
+}
+
+/// Sort key for releasing held keys: other keys first, then the modifiers
+/// in the opposite order of pressing them (ctrl last).
+pub fn release_order(vk: Vk) -> usize {
+    MODIFIERS
+        .iter()
+        .position(|&(_, m)| m == vk)
+        .map_or(0, |i| MODIFIERS.len() - i)
 }
 
 /// Name of a virtual-key code, for messages.
@@ -263,6 +271,14 @@ mod tests {
             "a+b".parse::<Chord>(),
             Err(ChordError::NotAModifier("a".into()))
         );
+    }
+
+    #[test]
+    fn modifiers_are_released_last_ctrl_last_of_all() {
+        let mut keys: Vec<Vk> = chord("ctrl+shift+alt+win+tab").keys().collect();
+        keys.sort_by_key(|&k| release_order(k));
+        let names: Vec<String> = keys.into_iter().map(name).collect();
+        assert_eq!(names, ["tab", "win", "alt", "shift", "ctrl"]);
     }
 
     #[test]

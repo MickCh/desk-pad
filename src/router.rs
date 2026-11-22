@@ -56,7 +56,7 @@ impl Held {
             out.mouse_button(b, false);
         }
         let mut keys: Vec<Vk> = self.keys.drain().map(|(k, _)| k).collect();
-        keys.sort_by_key(|&k| keys::is_modifier(k));
+        keys.sort_by_key(|&k| keys::release_order(k));
         for k in keys {
             out.key(k, false);
         }
@@ -129,6 +129,19 @@ impl Router {
             test_times: HashMap::new(),
             last_tick: now,
         }
+    }
+
+    /// Use new bindings and settings (e.g. after the file was saved).
+    /// Everything held for the old ones is released first.
+    pub fn set_layout(&mut self, layout: Layout, out: &mut dyn Output) {
+        self.release_all(out);
+        self.debouncer
+            .set_window(Duration::from_millis(layout.debounce_ms));
+        self.hat
+            .set_interval(Duration::from_millis(layout.repeat_ms));
+        self.steps = Stepper::default();
+        self.mode.reset();
+        self.layout = layout;
     }
 
     pub fn set_test_mode(&mut self, on: bool, out: &mut dyn Output) {
@@ -647,6 +660,22 @@ mod tests {
         r.event(Button(9), t0 + ms(400), &mut out);
         r.event(Button(2), t0 + ms(600), &mut out);
         assert_eq!(out.sent().last(), Some(&Out::Key("esc", true)));
+    }
+
+    #[test]
+    fn new_layout_releases_old_bindings_and_applies() {
+        let t0 = Instant::now();
+        let mut r = router(t0);
+        let mut out = TestOut::default();
+        r.event(Button(4), t0, &mut out); // ctrl+shift+tab held
+        let mut l = layout();
+        l.buttons.insert(5, "key:f5".parse().unwrap());
+        r.set_layout(l, &mut out);
+        assert!(r.held.is_empty());
+        assert_eq!(out.sent().last(), Some(&Out::Key("ctrl", false)));
+        r.event(ButtonUp(4), t0 + ms(10), &mut out);
+        r.event(Button(4), t0 + ms(500), &mut out);
+        assert_eq!(out.sent().last(), Some(&Out::Key("f5", true)));
     }
 
     #[test]

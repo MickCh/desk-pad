@@ -6,18 +6,21 @@
 //! [`win`] holds everything that calls the Win32 API.
 
 mod action;
+mod config;
 mod keys;
 mod layout;
 mod router;
+mod watch;
 mod win;
 
-use layout::Layout;
 use pad_core::gamepad::{Gamepad, PadEvent};
 use pad_core::input::Log;
 use router::Router;
+use std::path::PathBuf;
 use std::process::ExitCode;
 use std::thread;
 use std::time::{Duration, Instant};
+use watch::Watcher;
 use win::foreground::{Foreground, foreground};
 use win::send::SendInputOutput;
 
@@ -30,12 +33,15 @@ const FOREGROUND_CHECK: Duration = Duration::from_millis(200);
 const HELP: &str = "\
 desk-pad: use a USB gamepad as keyboard and mouse.
 
-Usage: desk-pad [--test] [--seconds N]
+Usage: desk-pad [--test] [--seconds N] [--config PATH]
 
-  --test        Button test: print buttons (with timing), axes and D-pad as
-                they are used, and the program and title of the window in
-                front. Sends nothing.
-  --seconds N   Stop after N seconds (e.g. to run the test from a script).
+  --test          Button test: print buttons (with timing), axes and D-pad
+                  as they are used, and the program and title of the window
+                  in front. Sends nothing.
+  --seconds N     Stop after N seconds (e.g. to run the test from a script).
+  --config PATH   Configuration file (default:
+                  %APPDATA%\\desk-pad\\desk-pad.toml, created on first start).
+                  Reloaded when saved.
 
 Stop with Ctrl+C.";
 
@@ -53,35 +59,59 @@ impl Log for ConsoleLog {
     }
 }
 
-fn main() -> ExitCode {
-    let mut test = false;
-    let mut limit = None;
+/// Command-line options.
+struct Options {
+    test: bool,
+    limit: Option<Duration>,
+    config: Option<PathBuf>,
+}
+
+/// `Err` holds the message for an invalid command line; `Ok(None)` means
+/// help was printed.
+fn options() -> Result<Option<Options>, String> {
+    let mut o = Options {
+        test: false,
+        limit: None,
+        config: None,
+    };
     let mut args = std::env::args().skip(1);
     while let Some(arg) = args.next() {
         match arg.as_str() {
-            "--test" => test = true,
+            "--test" => o.test = true,
             "--seconds" => match args.next().and_then(|n| n.parse::<f32>().ok()) {
-                Some(n) if n > 0.0 => limit = Some(Duration::from_secs_f32(n)),
-                _ => {
-                    eprintln!(
-                        "--seconds needs a positive number
-
-{HELP}"
-                    );
-                    return ExitCode::from(2);
+                Some(n) if n > 0.0 && n.is_finite() => {
+                    o.limit = Some(Duration::from_secs_f32(n));
                 }
+                _ => return Err("--seconds needs a positive number".into()),
+            },
+            "--config" => match args.next() {
+                Some(p) => o.config = Some(p.into()),
+                None => return Err("--config needs a file name".into()),
             },
             "-h" | "--help" => {
                 println!("{HELP}");
-                return ExitCode::SUCCESS;
+                return Ok(None);
             }
-            other => {
-                eprintln!("unknown option {other}\n\n{HELP}");
-                return ExitCode::from(2);
-            }
+            other => return Err(format!("unknown option {other}")),
         }
     }
-    match run(test, limit) {
+    Ok(Some(o))
+}
+
+fn main() -> ExitCode {
+    let opts = match options() {
+        Ok(Some(o)) => o,
+        Ok(None) => return ExitCode::SUCCESS,
+        Err(e) => {
+            eprintln!(
+                "{e}
+
+{HELP}"
+            );
+            return ExitCode::from(2);
+        }
+    };
+    match run(&opts) {
         Ok(()) => ExitCode::SUCCESS,
         Err(e) => {
             eprintln!("desk-pad: {e}");
@@ -90,8 +120,17 @@ fn main() -> ExitCode {
     }
 }
 
-fn run(test: bool, limit: Option<Duration>) -> Result<(), String> {
-    let end = limit.map(|d| Instant::now() + d);
+fn run(opts: &Options) -> Result<(), String> {
+    let test = opts.test;
+    let end = opts.limit.map(|d| Instant::now() + d);
+    let path = match &opts.config {
+        Some(p) => p.clone(),
+        None => config::default_path().ok_or("APPDATA is not set: use --config PATH")?,
+    };
+    let created = config::create_default(&path).map_err(|e| e.to_string())?;
+    let layout = config::load(&path).map_err(|e| e.to_string())?;
+    let mut watcher = Watcher::new(path.clone(), Instant::now());
+
     let mut out = SendInputOutput::new(ConsoleLog {
         start: Instant::now(),
     });
@@ -100,7 +139,16 @@ fn run(test: bool, limit: Option<Duration>) -> Result<(), String> {
     }
     let _timer = win::TimerResolution::new();
     let mut gamepad = Gamepad::new().map_err(|e| format!("SDL: {e}"))?;
-    let mut router = Router::new(Layout::default(), Instant::now());
+    out.log(&format!(
+        "Configuration: {}{}",
+        path.display(),
+        if created {
+            " (created with the defaults)"
+        } else {
+            ""
+        }
+    ));
+    let mut router = Router::new(layout, Instant::now());
     router.set_test_mode(test, &mut out);
     if test {
         out.log("Button test: press buttons, move the sticks, switch windows. Ctrl+C ends.");
@@ -133,6 +181,19 @@ fn run(test: bool, limit: Option<Duration>) -> Result<(), String> {
             PadEvent::Input(input) => router.event(input, now, &mut out),
         });
         router.tick(now, |axis| gamepad.axis(axis), &mut out);
+
+        if watcher.poll(now) {
+            match config::load(&path) {
+                Ok(layout) => {
+                    router.set_layout(layout, &mut out);
+                    out.log("Configuration reloaded.");
+                }
+                Err(e) => out.notice(&format!(
+                    "{e}
+The previous settings stay active."
+                )),
+            }
+        }
 
         if test && now >= next_front_check {
             next_front_check = now + FOREGROUND_CHECK;

@@ -1,6 +1,7 @@
 //! What a button or D-pad direction does.
 
 use crate::keys::{Chord, ChordError};
+use serde::Deserialize;
 use std::fmt;
 use std::str::FromStr;
 
@@ -33,7 +34,8 @@ impl MouseButton {
 }
 
 /// A binding. Keys and mouse buttons stay down as long as the pad's button.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(try_from = "String")]
 pub enum Action {
     /// `key:ctrl+tab`
     Key(Chord),
@@ -95,6 +97,14 @@ impl FromStr for Action {
             "pad:toggle" => Ok(Action::PadToggle),
             _ => Err(ActionError::Unknown(s.into())),
         }
+    }
+}
+
+impl TryFrom<String> for Action {
+    type Error = ActionError;
+
+    fn try_from(s: String) -> Result<Self, ActionError> {
+        s.parse()
     }
 }
 

@@ -1,5 +1,5 @@
-//! The bindings in effect. Built in for now; read from `desk-pad.toml` in
-//! stage 3 (see docs/PLAN.md).
+//! The bindings and settings in effect, as read from the configuration
+//! file by [`crate::config`].
 
 use crate::action::Action;
 use pad_core::logic::AxisParams;
@@ -67,60 +67,11 @@ pub struct Layout {
     pub right: Stick,
 }
 
-fn action(s: &str) -> Action {
-    s.parse()
-        .unwrap_or_else(|e| panic!("built-in binding {s}: {e}"))
-}
-
 impl Default for Layout {
-    /// Made for the Art AG-16T (button numbers as printed on it).
+    /// The documented default configuration (`config.toml`, embedded).
     fn default() -> Self {
-        let buttons = [
-            (1, "mouse:left"),
-            (2, "mouse:right"),
-            (3, "key:esc"),
-            (4, "key:enter"),
-            // 5 and 6 are kept for layer:nav and the window switcher (stage 4).
-            (7, "key:alt+left"),
-            (8, "key:alt+right"),
-            (9, "key:win+tab"),
-            (10, "pad:toggle"),
-            (11, "mouse:middle"),
-            (12, "key:win+alt+k"),
-        ]
-        .into_iter()
-        .map(|(n, a)| (n, action(a)))
-        .collect();
-        Layout {
-            buttons,
-            dpad: Dpad {
-                up: Some(action("key:up")),
-                down: Some(action("key:down")),
-                left: Some(action("key:ctrl+shift+tab")),
-                right: Some(action("key:ctrl+tab")),
-            },
-            repeat_ms: 300,
-            debounce_ms: 120,
-            detect_digital_mode: true,
-            left: Stick {
-                role: Some(StickRole::Mouse),
-                axis_x: 0,
-                axis_y: 1,
-                deadzone: 0.15,
-                min_speed: 60.0,
-                max_speed: 1600.0,
-                invert_y: false,
-            },
-            right: Stick {
-                role: Some(StickRole::Scroll),
-                axis_x: 3,
-                axis_y: 4,
-                deadzone: 0.2,
-                min_speed: 1.0,
-                max_speed: 25.0,
-                invert_y: false,
-            },
-        }
+        crate::config::parse(crate::config::DEFAULT_CONFIG)
+            .unwrap_or_else(|e| panic!("built-in config.toml: {e}"))
     }
 }
 

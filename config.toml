@@ -1,0 +1,75 @@
+# desk-pad configuration
+#
+# Location: %APPDATA%\desk-pad\desk-pad.toml (written with these defaults on
+# first start; another file with `desk-pad --config PATH`). desk-pad reloads
+# the file when it is saved. If it has an error, the message names the line
+# and the previous settings stay active.
+#
+# Made for the Art AG-16T: button numbers as printed on it. For other pads,
+# run `desk-pad --test` to see the numbers of buttons and axes.
+
+[pad]
+debounce_ms = 120           # ignore contact bounce; also hides the pad's Turbo
+repeat_ms = 300             # D-pad auto-repeat while held
+detect_digital_mode = true  # DragonRise pads: ignore buttons 1–4 while the LED is green
+
+# Hardware: which axes form each stick, and the dead zone (0–1) to ignore
+# small deflections of worn sticks.
+[sticks.left]
+axis_x = 0
+axis_y = 1
+deadzone = 0.15
+
+[sticks.right]
+axis_x = 3
+axis_y = 4
+deadzone = 0.2
+
+# Speed at a slight and at full deflection (quadratic curve in between).
+[mouse]
+min_speed = 60              # pixels per second
+max_speed = 1600
+invert_y = false
+
+[scroll]
+min_speed = 1               # wheel notches per second (fractions are sent too: smooth)
+max_speed = 25
+invert_y = false            # true: pushing up scrolls down
+
+# Bindings. Actions:
+#   key:<keys>       keys held as long as the button, e.g. key:ctrl+shift+tab,
+#                    key:alt+v, key:f5, key:win. Modifiers: ctrl, shift, alt,
+#                    win. Keys: a–z, 0–9, f1–f24, enter, esc, tab, space,
+#                    backspace, delete, insert, home, end, pageup, pagedown,
+#                    up, down, left, right, printscreen, capslock, pause, menu,
+#                    volume_mute, volume_down, volume_up, media_play_pause,
+#                    media_next, media_prev, media_stop, browser_back,
+#                    browser_forward, browser_refresh, ; = , - . / ` [ \ ] '
+#   mouse:<button>   left, right, middle, back, forward (held = drag)
+#   pad:toggle       pause / resume the pad
+# Sticks: "mouse", "scroll" or "none".
+#
+# Only [profiles.default] for now; per-application profiles (Windows
+# Terminal, browser, Teams, …) come in a later version.
+[profiles.default.buttons]
+1 = "mouse:left"
+2 = "mouse:right"
+3 = "key:esc"
+4 = "key:enter"
+# 5 and 6 are kept for a layer and the window switcher (later versions).
+7 = "key:alt+left"          # back
+8 = "key:alt+right"         # forward
+9 = "key:win+tab"           # task view
+10 = "pad:toggle"
+11 = "mouse:middle"         # left stick click
+12 = "key:win+alt+k"        # right stick click: mute the microphone in calls (Windows 11)
+
+[profiles.default.dpad]
+left = "key:ctrl+shift+tab" # previous tab (browser, Windows Terminal)
+right = "key:ctrl+tab"      # next tab
+up = "key:up"
+down = "key:down"
+
+[profiles.default.sticks]
+left = "mouse"
+right = "scroll"
