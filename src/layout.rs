@@ -68,10 +68,12 @@ pub struct Layout {
 }
 
 impl Default for Layout {
-    /// The documented default configuration (`config.toml`, embedded).
+    /// The default profile of the documented default configuration
+    /// (`config.toml`, embedded).
     fn default() -> Self {
         crate::config::parse(crate::config::DEFAULT_CONFIG)
             .unwrap_or_else(|e| panic!("built-in config.toml: {e}"))
+            .default
     }
 }
 

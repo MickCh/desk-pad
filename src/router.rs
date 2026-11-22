@@ -95,6 +95,9 @@ pub struct Router {
     test_mode: bool,
     /// `pad:toggle`: everything but the toggle itself is ignored.
     paused: bool,
+    /// The program in front has a passthrough profile (e.g. REAPER, where
+    /// reaper-pad has the pad): send nothing.
+    passthrough: bool,
     device: Option<Device>,
     debouncer: Debouncer,
     hat: HatRepeat,
@@ -120,6 +123,7 @@ impl Router {
             layout,
             test_mode: false,
             paused: false,
+            passthrough: false,
             device: None,
             mode: ModeDetector::default(),
             pressed: HashMap::new(),
@@ -140,8 +144,51 @@ impl Router {
         self.hat
             .set_interval(Duration::from_millis(layout.repeat_ms));
         self.steps = Stepper::default();
-        self.mode.reset();
+        if !layout.detect_digital_mode {
+            self.mode.reset();
+        }
         self.layout = layout;
+    }
+
+    /// Send nothing (or again) while a passthrough profile is in front.
+    pub fn set_passthrough(&mut self, on: bool, out: &mut dyn Output) {
+        if on {
+            self.release_all(out);
+        }
+        self.passthrough = on;
+    }
+
+    /// Pause or resume, as `pad:toggle` does.
+    #[allow(dead_code)] // for the tray icon (next step)
+    pub fn toggle_pause(&mut self, out: &mut dyn Output) {
+        self.set_paused(!self.paused, out);
+    }
+
+    #[allow(dead_code)] // for the tray icon (next step)
+    pub fn paused(&self) -> bool {
+        self.paused
+    }
+
+    #[allow(dead_code)] // for the tray icon (next step)
+    pub fn passthrough(&self) -> bool {
+        self.passthrough
+    }
+
+    /// Whether a pad is connected.
+    #[allow(dead_code)] // for the tray icon (next step)
+    pub fn has_pad(&self) -> bool {
+        self.device.is_some()
+    }
+
+    /// Whether a DragonRise pad is in digital mode (LED green).
+    #[allow(dead_code)] // for the tray icon (next step)
+    pub fn digital(&self) -> bool {
+        self.mode.digital()
+    }
+
+    /// No pad button is held: a good moment to switch profiles.
+    pub fn idle(&self) -> bool {
+        self.pressed.is_empty() && self.releasing.is_empty()
     }
 
     pub fn set_test_mode(&mut self, on: bool, out: &mut dyn Output) {
@@ -175,6 +222,12 @@ impl Router {
             self.test_report(ev, now, out);
             return;
         }
+        if self.passthrough {
+            if let InputEvent::Hat(xy) = ev {
+                self.hat.set(xy, now); // so no stale repeat starts afterwards
+            }
+            return;
+        }
         match ev {
             InputEvent::Button(idx) => self.button_down(u32::from(idx) + 1, now, out),
             InputEvent::ButtonUp(idx) => self.button_up(u32::from(idx) + 1, now, out),
@@ -201,7 +254,7 @@ impl Router {
         let dt = now.duration_since(self.last_tick).as_secs_f32().min(0.1);
         self.last_tick = now;
         self.finish_releases(now, out);
-        if self.test_mode || self.paused || self.device.is_none() {
+        if self.test_mode || self.paused || self.passthrough || self.device.is_none() {
             return;
         }
         let dirs = self.hat.tick(now);
@@ -676,6 +729,33 @@ mod tests {
         r.event(ButtonUp(4), t0 + ms(10), &mut out);
         r.event(Button(4), t0 + ms(500), &mut out);
         assert_eq!(out.sent().last(), Some(&Out::Key("f5", true)));
+    }
+
+    #[test]
+    fn passthrough_releases_everything_and_sends_nothing() {
+        let t0 = Instant::now();
+        let mut r = router(t0);
+        let mut out = TestOut::default();
+        r.event(Button(0), t0, &mut out);
+        assert!(!r.idle());
+        r.set_passthrough(true, &mut out);
+        assert!(r.idle());
+        assert_eq!(
+            out.sent().last(),
+            Some(&Out::Mouse(MouseButton::Left, false))
+        );
+        let n = out.sent().len();
+        r.event(Button(2), t0 + ms(500), &mut out);
+        r.event(Button(9), t0 + ms(500), &mut out); // pad:toggle too
+        r.event(Hat((1, 0)), t0 + ms(500), &mut out);
+        r.tick(t0 + ms(900), |_| Some(32767), &mut out);
+        assert_eq!(out.sent().len(), n);
+        assert!(!r.paused());
+        r.set_passthrough(false, &mut out);
+        r.event(Hat((0, 0)), t0 + ms(950), &mut out);
+        r.event(Button(2), t0 + ms(1000), &mut out);
+        assert_eq!(out.sent().last(), Some(&Out::Key("esc", true)));
+        assert_eq!(out.sent().len(), n + 1, "no stale D-pad repeat");
     }
 
     #[test]

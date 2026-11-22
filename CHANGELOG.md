@@ -21,3 +21,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   `--config PATH`), created with the documented defaults on first start and
   reloaded when saved. Errors name the line; the previous settings stay
   active.
+- Profiles for single programs (`match`), chosen by the program in front;
+  their bindings replace the default ones. `passthrough = true` sends
+  nothing: the default configuration does this for REAPER, where
+  reaper-pad has the pad.

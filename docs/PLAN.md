@@ -171,7 +171,7 @@ passthrough = true                   # reaper-pad has the pad: send nothing
 - [x] Right stick: smooth vertical and horizontal scroll.
 - [x] Manual check: the default pointer and scroll speeds are fine on the
   real pad (2026-11-22).
-- [ ] Manual check: selecting text in Windows Terminal with button 1 held.
+- [x] Manual check: selecting text in Windows Terminal with button 1 held.
 
 ### Stage 3: configuration
 - [x] `desk-pad.toml` in `%APPDATA%\desk-pad\` (or `--config PATH`), the
@@ -189,12 +189,17 @@ passthrough = true                   # reaper-pad has the pad: send nothing
   until then.
 
 ### Stage 4: profiles and layers
-- [ ] Active exe and window title (`SetWinEventHook`: foreground and name
-  changes).
-- [ ] Profiles with `match`, `title` (regex), `inherit`, `passthrough`.
+- [x] The program in front, checked every 100 ms (`GetForegroundWindow`;
+  polling instead of `SetWinEventHook`, which would need a message loop on
+  the input thread). Window titles are not used for profiles yet.
+- [x] Profiles with `match` and `passthrough`; their bindings override
+  `[profiles.default]` (implicit inheritance). A switch waits until no pad
+  button is held, so a drag or a held key ends where it started.
+- [x] `[profiles.reaper]` with `passthrough` in the default configuration.
+- [ ] `title` (regex), explicit `inherit`, `"none"` to unbind a button.
 - [ ] Layers (`layer:`), `switcher`, `profile:cycle`.
 - [ ] `text:`, `focus:` (with the Alt trick for `SetForegroundWindow`), `run:`.
-- [ ] Default profiles: terminal, browser, teams, reaper.
+- [ ] Default profiles: terminal, browser, teams.
 
 ### Stage 5: tray and UX
 - [ ] No console window (`windows_subsystem = "windows"`); log to a file.

@@ -13,9 +13,10 @@ mod router;
 mod watch;
 mod win;
 
+use config::Profiles;
 use pad_core::gamepad::{Gamepad, PadEvent};
 use pad_core::input::Log;
-use router::Router;
+use router::{Output, Router};
 use std::io::Write;
 use std::path::PathBuf;
 use std::process::ExitCode;
@@ -28,8 +29,51 @@ use win::send::SendInputOutput;
 /// Input loop period: ~250 Hz, smooth enough for the pointer.
 const PERIOD: Duration = Duration::from_millis(4);
 
-/// How often `--test` checks which window is in front.
-const FOREGROUND_CHECK: Duration = Duration::from_millis(200);
+/// How often the program in front is checked (to choose the profile).
+const FOREGROUND_CHECK: Duration = Duration::from_millis(100);
+
+/// The profile in effect, following the program in front.
+#[derive(Default)]
+struct ActiveProfile {
+    /// Name of the profile in effect; empty until the first choice.
+    name: String,
+}
+
+impl ActiveProfile {
+    /// Switch to the profile of `exe` if it differs, once no pad button is
+    /// held (a drag or a held key ends where it started).
+    fn follow(
+        &mut self,
+        exe: &str,
+        profiles: &Profiles,
+        router: &mut Router,
+        out: &mut dyn Output,
+    ) {
+        let (name, layout) = profiles.select(exe);
+        if name == self.name || !router.idle() {
+            return;
+        }
+        match layout {
+            Some(l) => {
+                router.set_layout(l.clone(), out);
+                router.set_passthrough(false, out);
+            }
+            None => router.set_passthrough(true, out),
+        }
+        let first = self.name.is_empty();
+        self.name = name.to_string();
+        if !(first && name == "default") {
+            out.log(&format!(
+                "Profile: {name}{}",
+                if layout.is_none() {
+                    " (passthrough: nothing is sent)"
+                } else {
+                    ""
+                }
+            ));
+        }
+    }
+}
 
 const HELP: &str = "\
 desk-pad: use a USB gamepad as keyboard and mouse.
@@ -138,7 +182,7 @@ fn run(opts: &Options) -> Result<(), String> {
         None => config::default_path().ok_or("APPDATA is not set: use --config PATH")?,
     };
     let created = config::create_default(&path).map_err(|e| e.to_string())?;
-    let layout = config::load(&path).map_err(|e| e.to_string())?;
+    let mut profiles = config::load(&path).map_err(|e| e.to_string())?;
     let mut watcher = Watcher::new(path.clone(), Instant::now());
 
     let mut out = SendInputOutput::new(ConsoleLog {
@@ -158,7 +202,8 @@ fn run(opts: &Options) -> Result<(), String> {
             ""
         }
     ));
-    let mut router = Router::new(layout, Instant::now());
+    let mut router = Router::new(profiles.default.clone(), Instant::now());
+    let mut active = ActiveProfile::default();
     router.set_test_mode(test, &mut out);
     if test {
         out.log("Button test: press buttons, move the sticks, switch windows. Ctrl+C ends.");
@@ -194,8 +239,11 @@ fn run(opts: &Options) -> Result<(), String> {
 
         if watcher.poll(now) {
             match config::load(&path) {
-                Ok(layout) => {
-                    router.set_layout(layout, &mut out);
+                Ok(p) => {
+                    profiles = p;
+                    router.set_layout(profiles.default.clone(), &mut out);
+                    router.set_passthrough(false, &mut out);
+                    active = ActiveProfile::default(); // chosen again below
                     out.log("Configuration reloaded.");
                 }
                 Err(e) => out.notice(&format!(
@@ -205,16 +253,19 @@ The previous settings stay active."
             }
         }
 
-        if test && now >= next_front_check {
+        if now >= next_front_check {
             next_front_check = now + FOREGROUND_CHECK;
             let current = foreground();
-            if current != front {
-                if let Some(f) = &current {
-                    out.log(&format!("window: {} — \"{}\"", f.exe, f.title));
-                }
-                front = current;
+            if test
+                && current != front
+                && let Some(f) = &current
+            {
+                out.log(&format!("window: {} — \"{}\"", f.exe, f.title));
             }
+            front = current;
         }
+        let exe = front.as_ref().map_or("", |f| f.exe.as_str());
+        active.follow(exe, &profiles, &mut router, &mut out);
         thread::sleep(PERIOD);
     }
 

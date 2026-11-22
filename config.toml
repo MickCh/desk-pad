@@ -49,8 +49,8 @@ invert_y = false            # true: pushing up scrolls down
 #   pad:toggle       pause / resume the pad
 # Sticks: "mouse", "scroll" or "none".
 #
-# Only [profiles.default] for now; per-application profiles (Windows
-# Terminal, browser, Teams, …) come in a later version.
+# [profiles.default] applies everywhere; the profiles of single programs
+# are at the end.
 [profiles.default.buttons]
 1 = "mouse:left"
 2 = "mouse:right"
@@ -74,3 +74,20 @@ down = "key:down"
 [profiles.default.sticks]
 left = "mouse"
 right = "scroll"
+
+# Profiles of single programs, chosen by the program in front. Their
+# bindings replace those of [profiles.default]; anything not listed comes
+# from there. A profile switch waits until no pad button is held.
+#   match = ["program.exe", …]   program file names (see desk-pad --test)
+#   passthrough = true           send nothing while the program is in front
+
+# REAPER: reaper-pad has the pad there.
+[profiles.reaper]
+match = ["reaper.exe"]
+passthrough = true
+
+# Example: the D-pad switches zellij tabs in Windows Terminal.
+# [profiles.terminal]
+# match = ["WindowsTerminal.exe"]
+# dpad.left = "key:alt+left"
+# dpad.right = "key:alt+right"
