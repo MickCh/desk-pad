@@ -56,9 +56,10 @@ invert_y = false            # true: pushing up scrolls down
 2 = "mouse:right"
 3 = "key:esc"
 4 = "key:enter"
-# 5 and 6 are kept for a layer and the window switcher (later versions).
-7 = "key:alt+left"          # back
-8 = "key:alt+right"         # forward
+5 = "key:alt+v"             # paste an image in Claude CLI
+6 = "key:shift+insert"      # paste an image in Devin CLI (elsewhere: paste)
+7 = "key:alt+left"          # back; in zellij: previous tab
+8 = "key:alt+right"         # forward; in zellij: next tab
 9 = "key:win+tab"           # task view
 10 = "pad:toggle"
 11 = "mouse:middle"         # left stick click

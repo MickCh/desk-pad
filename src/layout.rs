@@ -83,6 +83,6 @@ mod tests {
     fn default_layout_builds() {
         let l = Layout::default();
         assert_eq!(l.buttons[&10], Action::PadToggle);
-        assert_eq!(l.buttons.len(), 10);
+        assert_eq!(l.buttons.len(), 12);
     }
 }

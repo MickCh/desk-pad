@@ -66,8 +66,9 @@ buttons.1  = "mouse:left"            # held = drag
 buttons.2  = "mouse:right"
 buttons.3  = "key:esc"
 buttons.4  = "key:enter"
-buttons.5  = "layer:nav"             # held L1 switches the layer        (stage 4)
-buttons.6  = "switcher"              # held: Alt down, D-pad = Tab/Shift+Tab (stage 4)
+buttons.5  = "key:alt+v"             # paste an image in Claude CLI
+buttons.6  = "key:shift+insert"      # paste an image in Devin CLI
+# layer:nav and the switcher (stage 4) need other buttons or combinations.
 buttons.7  = "key:alt+left"          # back
 buttons.8  = "key:alt+right"         # forward
 buttons.9  = "key:win+tab"
@@ -98,20 +99,6 @@ buttons.11 = "key:shift+tab"
 dpad.left  = "key:alt+left"          # move focus between panes
 dpad.right = "key:alt+right"
 
-# Claude CLI and Devin CLI both run inside WindowsTerminal.exe: they are told
-# apart by the window title (the title of the active tab).
-[profiles.claude]
-match = ["WindowsTerminal.exe"]
-title = "(?i)claude"
-inherit = "terminal"
-buttons.7 = "paste_image"            # Alt+V in Claude CLI
-
-[profiles.devin]
-match = ["WindowsTerminal.exe"]
-title = "(?i)devin"
-inherit = "terminal"
-buttons.7 = "paste_image"            # Shift+Insert in Devin CLI
-
 [profiles.teams]
 match = ["ms-teams.exe"]
 inherit = "default"
@@ -133,24 +120,26 @@ passthrough = true                   # reaper-pad has the pad: send nothing
   - `run:<command>`: start a program.
   - `profile:cycle`: switch the profile by hand.
   - `pad:toggle`: pause or resume the pad.
-- **`paste_image`:** Claude CLI pastes an image with **Alt+V**, Devin CLI with
-  **Shift+Insert**. The binding is per profile (`paste_image = "key:alt+v"`).
-  Together with a `key:win+shift+s` binding (screen snip), taking a
-  screenshot and pasting it into the CLI is two button presses.
+- **Pasting images into Claude CLI and Devin CLI (decided 2026-11-22):**
+  Claude CLI pastes an image with **Alt+V**, Devin CLI with
+  **Shift+Insert**. They get a button each (5 and 6 in the default
+  profile), and the user chooses which to press: no detection. Telling the
+  two apart automatically is not reliable: both run inside
+  WindowsTerminal.exe, usually in zellij panes, and the window title showed
+  neither (see the measurement below). Together with a `key:win+shift+s`
+  binding (screen snip), taking a screenshot and pasting it into the CLI is
+  two button presses.
 - **Profile matching:** the most specific profile wins (exe + title, then
   exe, then `default`). The title is checked again when it changes
   (`EVENT_OBJECT_NAMECHANGE`), so switching tabs in Windows Terminal switches
   the profile too.
 - **Measured (2026-11-22, `desk-pad --test`):** a Windows Terminal tab
-  running Claude CLI was titled `circular-elephant | C:\Program
-  Files\PowerShell\7\pwsh.EXE`, without "claude" in it. So `(?i)claude`
-  alone is not enough: check the real titles with `--test` before choosing
-  the patterns, and expect to need the fallback below. In a later session
+  with zellij running Claude CLI was titled `circular-elephant | C:\Program
+  Files\PowerShell\7\pwsh.EXE`, without "claude" in it. In a later session
   the same tab was `erudite-aardvark | …`: the first part changes from
-  session to session, so it can't be matched either.
-- **Fallback when a CLI doesn't set a useful title:** a fixed tab title in the
-  Windows Terminal profile (`"tabTitle"` + `"suppressApplicationTitle": true`),
-  or `profile:cycle` on a button.
+  session to session (it is probably the random zellij session name; the
+  second part is the focused pane's title), so it can't be matched either.
+  Window titles still serve to tell applications apart (browser, Teams).
 - **`passthrough` for REAPER:** both programs read the same pad at once (SDL
   background events), so desk-pad must stay quiet while REAPER is in front.
 
@@ -170,6 +159,7 @@ passthrough = true                   # reaper-pad has the pad: send nothing
 - [x] Input loop at ~250 Hz, `Output` trait, `SendInput` output.
 - [x] Key chords and mouse buttons, held as long as the button.
 - [x] Built-in default layout (the `default` profile above, without layers).
+- [x] Buttons 5 / 6 paste an image in Claude CLI / Devin CLI (2026-11-22).
 - [x] `--test`: prints buttons, axes, D-pad, and the active exe and window
   title (to write `match` / `title` patterns).
 - [x] Safe exit: keys released on Ctrl+C / console close / pause / unplug.
@@ -202,9 +192,9 @@ passthrough = true                   # reaper-pad has the pad: send nothing
 - [ ] Active exe and window title (`SetWinEventHook`: foreground and name
   changes).
 - [ ] Profiles with `match`, `title` (regex), `inherit`, `passthrough`.
-- [ ] Layers (`layer:`), `switcher`, `paste_image`, `profile:cycle`.
+- [ ] Layers (`layer:`), `switcher`, `profile:cycle`.
 - [ ] `text:`, `focus:` (with the Alt trick for `SetForegroundWindow`), `run:`.
-- [ ] Default profiles: terminal, claude, devin, browser, teams, reaper.
+- [ ] Default profiles: terminal, browser, teams, reaper.
 
 ### Stage 5: tray and UX
 - [ ] No console window (`windows_subsystem = "windows"`); log to a file.

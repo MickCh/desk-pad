@@ -299,7 +299,9 @@ mod tests {
     #[test]
     fn default_config_parses_with_the_documented_values() {
         let l = parse(DEFAULT_CONFIG).unwrap();
-        assert_eq!(l.buttons.len(), 10);
+        assert_eq!(l.buttons.len(), 12);
+        assert_eq!(l.buttons[&5], "key:alt+v".parse().unwrap());
+        assert_eq!(l.buttons[&6], "key:shift+insert".parse().unwrap());
         assert_eq!(l.buttons[&10], Action::PadToggle);
         assert_eq!(l.buttons[&4], "key:enter".parse().unwrap());
         assert_eq!(l.dpad.right, Some("key:ctrl+tab".parse().unwrap()));

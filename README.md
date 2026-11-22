@@ -23,8 +23,9 @@ numbers match its printed labels.
 | **1** | Left mouse button (hold to drag) |
 | **2** | Right mouse button |
 | **3 / 4** | Esc / Enter |
-| **5 / 6** | (reserved: layer, window switcher) |
-| **7 / 8** | Back / forward (Alt+← / Alt+→) |
+| **5** | Paste an image in Claude CLI (Alt+V) |
+| **6** | Paste an image in Devin CLI (Shift+Insert; elsewhere a normal paste) |
+| **7 / 8** | Back / forward (Alt+← / Alt+→); previous / next tab in zellij |
 | **9** | Task view (Win+Tab) |
 | **10** | Pause / resume the pad |
 | **11** (left stick click) | Middle mouse button |
