@@ -16,6 +16,7 @@ mod win;
 use pad_core::gamepad::{Gamepad, PadEvent};
 use pad_core::input::Log;
 use router::Router;
+use std::io::Write;
 use std::path::PathBuf;
 use std::process::ExitCode;
 use std::thread;
@@ -52,10 +53,19 @@ struct ConsoleLog {
 
 impl Log for ConsoleLog {
     fn log(&mut self, msg: &str) {
-        println!("[{:8.3}] {msg}", self.start.elapsed().as_secs_f32());
+        self.write("", msg);
     }
     fn notice(&mut self, msg: &str) {
-        println!("[{:8.3}] ! {msg}", self.start.elapsed().as_secs_f32());
+        self.write("! ", msg);
+    }
+}
+
+impl ConsoleLog {
+    /// Errors are ignored: `println!` would panic when the output is a
+    /// closed pipe, and a panic must not skip releasing held keys.
+    fn write(&self, mark: &str, msg: &str) {
+        let t = self.start.elapsed().as_secs_f32();
+        let _ = writeln!(std::io::stdout(), "[{t:8.3}] {mark}{msg}");
     }
 }
 
