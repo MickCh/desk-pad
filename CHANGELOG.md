@@ -5,6 +5,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-11-22
+
 ### Added
 - Built-in layout for the Art AG-16T: mouse buttons, keys and chords held
   as long as the pad's button, D-pad with auto-repeat, pause button.
@@ -38,3 +40,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   URL) and `none` (unbind an inherited binding).
 - Default profile for Microsoft Teams: 5 mutes, 6 toggles the camera.
 - `install.ps1` installs to `%LOCALAPPDATA%\Programs\desk-pad`.
+
+[Unreleased]: https://github.com/MickCh/desk-pad/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/MickCh/desk-pad/releases/tag/v0.1.0
