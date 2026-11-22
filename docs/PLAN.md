@@ -211,7 +211,8 @@ passthrough = true                   # reaper-pad has the pad: send nothing
 - [x] Default `teams` profile (5: mute, 6: camera). Terminal and browser
   need no profile: the defaults (D-pad Ctrl+Tab, 7/8 Alt+←/→, which
   switch zellij tabs too) work in both.
-- [ ] Manual check: the switcher on 9, Teams buttons.
+- [x] Manual check: the switcher on 9 (tap: task view; held + D-pad: Alt+Tab).
+- [ ] Manual check: Teams buttons 5/6 in a call.
 - [ ] Later, if needed: `focus:` (with the Alt trick for
   `SetForegroundWindow`), `profile:cycle`, `title` (regex; zellij makes
   terminal titles useless for telling CLIs apart), sticks in layers.
