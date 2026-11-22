@@ -1,0 +1,25 @@
+[package]
+name = "desk-pad"
+description = "Use a USB gamepad as keyboard and mouse on the Windows desktop"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.88"
+license = "MIT"
+publish = false
+
+[dependencies]
+# Shared with reaper-pad. A local path for now; later a git dependency on
+# the reaper-pad repository.
+pad-core = { path = "../reaper-pad/crates/pad-core" }
+windows-sys = { version = "0.61.2", features = [
+    "Win32_Foundation",
+    "Win32_Media",
+    "Win32_System_Console",
+    "Win32_System_Threading",
+    "Win32_UI_Input_KeyboardAndMouse",
+    "Win32_UI_WindowsAndMessaging",
+] }
+
+[profile.release]
+strip = true
+lto = true
