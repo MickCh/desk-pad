@@ -36,6 +36,11 @@ The D-pad repeats while held. Keys and mouse buttons stay down as long as
 the pad's button. When the pad is paused or unplugged, or desk-pad stops,
 everything it holds is released.
 
+If buttons 1–4 fire repeatedly while held, the pad's **Turbo** is on for
+them: press its Turbo button to switch it off. `desk-pad --test` shows how
+long each button was held and how soon it was pressed again, which tells
+Turbo (a steady series) from worn contacts (a few presses within ~100 ms).
+
 If the right stick acts like buttons 1–4, the pad is in digital mode: press
 its **Analog** button (LED red). desk-pad notices this on DragonRise pads and
 ignores buttons 1–4 until then.
@@ -44,8 +49,10 @@ ignores buttons 1–4 until then.
 
 ```
 desk-pad            run; stop with Ctrl+C
-desk-pad --test     button test: print buttons, axes, D-pad and the window
-                    in front (program and title); sends nothing
+desk-pad --test     button test: print buttons (with timing), axes, D-pad
+                    and the window in front (program and title); sends nothing
+desk-pad --test --seconds 15
+                    the same, ending by itself after 15 s
 ```
 
 Windows does not let a normal program send input to windows of programs

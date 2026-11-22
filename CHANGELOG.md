@@ -10,8 +10,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   as long as the pad's button, D-pad with auto-repeat, pause button.
 - Left stick moves the pointer (radial dead zone, speed curve, sub-pixel
   steps); right stick scrolls smoothly, vertically and horizontally.
-- `--test`: button test that also shows the program and title of the window
-  in front.
+- `--test`: button test with timing (how long a button was held, how soon
+  it was pressed again) that also shows the program and title of the window
+  in front. `--seconds N` ends it, or a normal run, after N seconds.
 - Keys held by desk-pad are released on pause, unplugging and exit
   (Ctrl+C, closing the console).
 - Digital mode of DragonRise pads is detected; buttons 1–4 are ignored

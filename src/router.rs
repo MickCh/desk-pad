@@ -107,6 +107,8 @@ pub struct Router {
     held: Held,
     /// Fractional pixels and wheel units, by (stick, axis).
     steps: Stepper<(u8, u8)>,
+    /// Test mode: when each button was last pressed and released.
+    test_times: HashMap<(u32, bool), Instant>,
     last_tick: Instant,
 }
 
@@ -124,6 +126,7 @@ impl Router {
             releasing: HashMap::new(),
             held: Held::default(),
             steps: Stepper::default(),
+            test_times: HashMap::new(),
             last_tick: now,
         }
     }
@@ -156,7 +159,7 @@ impl Router {
 
     pub fn event(&mut self, ev: InputEvent, now: Instant, out: &mut dyn Output) {
         if self.test_mode {
-            test_report(ev, out);
+            self.test_report(ev, now, out);
             return;
         }
         match ev {
@@ -321,6 +324,39 @@ impl Router {
         }
     }
 
+    /// Button test: what happened, with timing, so bounce, auto-fire and
+    /// bursts can be told apart.
+    fn test_report(&mut self, ev: InputEvent, now: Instant, out: &mut dyn Output) {
+        let ms =
+            |since: Option<&Instant>| since.map(|t| now.saturating_duration_since(*t).as_millis());
+        match ev {
+            InputEvent::Button(idx) => {
+                let num = u32::from(idx) + 1;
+                let after = ms(self.test_times.get(&(num, false)));
+                self.test_times.insert((num, true), now);
+                out.log(&match after {
+                    Some(n) if n < 1000 => format!("button {num} (+{n} ms after release)"),
+                    _ => format!("button {num}"),
+                });
+            }
+            InputEvent::ButtonUp(idx) => {
+                let num = u32::from(idx) + 1;
+                let held = ms(self.test_times.get(&(num, true)));
+                self.test_times.insert((num, false), now);
+                out.log(&match held {
+                    Some(n) => format!("button {num} released (held {n} ms)"),
+                    None => format!("button {num} released"),
+                });
+            }
+            InputEvent::Axis(idx, value) => {
+                if value.unsigned_abs() > TEST_AXIS_THRESHOLD {
+                    out.log(&format!("axis {idx}: {value}"));
+                }
+            }
+            InputEvent::Hat(xy) => out.log(&format!("D-pad {}", hat_name(xy))),
+        }
+    }
+
     /// Watch for the digital mode of DragonRise pads (see `ModeDetector`).
     fn check_mode(
         &mut self,
@@ -341,19 +377,6 @@ impl Router {
             Some(false) => log.notice("Gamepad is in analog mode — buttons 1–4 work again."),
             None => {}
         }
-    }
-}
-
-fn test_report(ev: InputEvent, out: &mut dyn Output) {
-    match ev {
-        InputEvent::Button(idx) => out.log(&format!("button {}", u32::from(idx) + 1)),
-        InputEvent::ButtonUp(idx) => out.log(&format!("button {} released", u32::from(idx) + 1)),
-        InputEvent::Axis(idx, value) => {
-            if value.unsigned_abs() > TEST_AXIS_THRESHOLD {
-                out.log(&format!("axis {idx}: {value}"));
-            }
-        }
-        InputEvent::Hat(xy) => out.log(&format!("D-pad {}", hat_name(xy))),
     }
 }
 
@@ -647,7 +670,9 @@ mod tests {
         let mut out = TestOut::default();
         r.set_test_mode(true, &mut out);
         r.event(Button(0), t0, &mut out);
-        r.event(ButtonUp(0), t0, &mut out);
+        r.event(ButtonUp(0), t0 + ms(85), &mut out);
+        r.event(Button(0), t0 + ms(103), &mut out);
+        r.event(Button(1), t0 + ms(103), &mut out);
         r.event(Hat((-1, 1)), t0, &mut out);
         r.event(InputEvent::Axis(3, -30000), t0, &mut out);
         r.tick(t0 + ms(100), |_| Some(32767), &mut out);
@@ -656,7 +681,9 @@ mod tests {
             out.logs(),
             [
                 "button 1",
-                "button 1 released",
+                "button 1 released (held 85 ms)",
+                "button 1 (+18 ms after release)",
+                "button 2",
                 "D-pad left-up",
                 "axis 3: -30000"
             ]

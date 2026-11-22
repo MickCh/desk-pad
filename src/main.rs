@@ -30,10 +30,12 @@ const FOREGROUND_CHECK: Duration = Duration::from_millis(200);
 const HELP: &str = "\
 desk-pad: use a USB gamepad as keyboard and mouse.
 
-Usage: desk-pad [--test]
+Usage: desk-pad [--test] [--seconds N]
 
-  --test   Button test: print buttons, axes and D-pad as they are used, and
-           the program and title of the window in front. Sends nothing.
+  --test        Button test: print buttons (with timing), axes and D-pad as
+                they are used, and the program and title of the window in
+                front. Sends nothing.
+  --seconds N   Stop after N seconds (e.g. to run the test from a script).
 
 Stop with Ctrl+C.";
 
@@ -53,9 +55,22 @@ impl Log for ConsoleLog {
 
 fn main() -> ExitCode {
     let mut test = false;
-    for arg in std::env::args().skip(1) {
+    let mut limit = None;
+    let mut args = std::env::args().skip(1);
+    while let Some(arg) = args.next() {
         match arg.as_str() {
             "--test" => test = true,
+            "--seconds" => match args.next().and_then(|n| n.parse::<f32>().ok()) {
+                Some(n) if n > 0.0 => limit = Some(Duration::from_secs_f32(n)),
+                _ => {
+                    eprintln!(
+                        "--seconds needs a positive number
+
+{HELP}"
+                    );
+                    return ExitCode::from(2);
+                }
+            },
             "-h" | "--help" => {
                 println!("{HELP}");
                 return ExitCode::SUCCESS;
@@ -66,7 +81,7 @@ fn main() -> ExitCode {
             }
         }
     }
-    match run(test) {
+    match run(test, limit) {
         Ok(()) => ExitCode::SUCCESS,
         Err(e) => {
             eprintln!("desk-pad: {e}");
@@ -75,7 +90,8 @@ fn main() -> ExitCode {
     }
 }
 
-fn run(test: bool) -> Result<(), String> {
+fn run(test: bool, limit: Option<Duration>) -> Result<(), String> {
+    let end = limit.map(|d| Instant::now() + d);
     let mut out = SendInputOutput::new(ConsoleLog {
         start: Instant::now(),
     });
@@ -103,7 +119,7 @@ fn run(test: bool) -> Result<(), String> {
 
     let mut front: Option<Foreground> = None;
     let mut next_front_check = Instant::now();
-    while !win::console::stop_requested() {
+    while !win::console::stop_requested() && end.is_none_or(|e| Instant::now() < e) {
         let now = Instant::now();
         gamepad.poll(|ev| match ev {
             PadEvent::Connected { name, device } => {
