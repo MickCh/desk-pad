@@ -25,3 +25,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   their bindings replace the default ones. `passthrough = true` sends
   nothing: the default configuration does this for REAPER, where
   reaper-pad has the pad.
+- Runs in the background with a tray icon: its colour shows the state, its
+  menu pauses, reloads and opens the configuration, opens the log, starts
+  desk-pad with Windows and quits. Notices show as Windows notifications;
+  the log goes to `%APPDATA%\desk-pad\desk-pad.log`. `--console` runs in a
+  console as before; `--test` opens a console of its own.
+- Only one desk-pad runs at a time.
+- `install.ps1` installs to `%LOCALAPPDATA%\Programs\desk-pad`.

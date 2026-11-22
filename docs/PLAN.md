@@ -40,7 +40,7 @@ desk-pad.exe
 │    Output (trait): key down/up, mouse button, mouse move, wheel
 │    win::SendInputOutput: the real Output, through SendInput
 ├─ foreground watcher: active exe + window title → profile        (stage 4)
-├─ tray icon, Win32 message loop                                  (stage 5)
+├─ tray icon, Win32 message loop (main thread)
 └─ config file watcher: reload on save
 ```
 
@@ -202,14 +202,25 @@ passthrough = true                   # reaper-pad has the pad: send nothing
 - [ ] Default profiles: terminal, browser, teams.
 
 ### Stage 5: tray and UX
-- [ ] No console window (`windows_subsystem = "windows"`); log to a file.
-- [ ] Tray icon showing the state: active / paused / no pad / digital mode,
-  and the current profile and layer in the tooltip.
-- [ ] Tray menu: pause, reload, button test, open config, start with
-  Windows, quit.
-- [ ] Feedback without rumble (DragonRise pads can't vibrate on Windows):
-  the tray icon, later maybe a small on-screen overlay on layer and profile
-  changes.
+- [x] No console window (`windows_subsystem = "windows"`); log to
+  `%APPDATA%\desk-pad\desk-pad.log`. `--test` and `--console` open a
+  console of their own (or write to a pipe the caller set up).
+- [x] Tray icon showing the state by colour: active (green), paused (grey),
+  no pad (red), digital mode (amber), passthrough profile (blue); the
+  tooltip names the state and profile.
+- [x] Tray menu: pause, reload, open configuration, open log, start with
+  Windows (`HKCU\...\Run`), quit. The button test stays on the command
+  line (`--test`): in-process it would need a console that closing would
+  kill desk-pad with.
+- [x] Notices (config errors, digital mode, pause) as Windows
+  notifications.
+- [x] One instance per session (named mutex); `install.ps1` installs to
+  `%LOCALAPPDATA%\Programs\desk-pad`.
+- [x] Held keys are also released by the `SendInput` layer when it is
+  dropped (normal exit, panic) and on logoff (`WM_ENDSESSION`).
+- [ ] Manual check: the icon, its menu, notifications, start with Windows.
+- [ ] Later, maybe: a small on-screen overlay on layer and profile
+  changes; the current layer in the tooltip (stage 4).
 
 ### Stage 6: release
 - [ ] CI (windows-latest): fmt, clippy, tests.

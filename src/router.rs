@@ -159,29 +159,24 @@ impl Router {
     }
 
     /// Pause or resume, as `pad:toggle` does.
-    #[allow(dead_code)] // for the tray icon (next step)
     pub fn toggle_pause(&mut self, out: &mut dyn Output) {
         self.set_paused(!self.paused, out);
     }
 
-    #[allow(dead_code)] // for the tray icon (next step)
     pub fn paused(&self) -> bool {
         self.paused
     }
 
-    #[allow(dead_code)] // for the tray icon (next step)
     pub fn passthrough(&self) -> bool {
         self.passthrough
     }
 
     /// Whether a pad is connected.
-    #[allow(dead_code)] // for the tray icon (next step)
     pub fn has_pad(&self) -> bool {
         self.device.is_some()
     }
 
     /// Whether a DragonRise pad is in digital mode (LED green).
-    #[allow(dead_code)] // for the tray icon (next step)
     pub fn digital(&self) -> bool {
         self.mode.digital()
     }

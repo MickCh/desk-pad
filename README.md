@@ -7,8 +7,9 @@ scroll with the other, switch windows, mute yourself in Teams.
 A sibling of [reaper-pad](../reaper-pad), which turns the same pad into a
 remote control for REAPER; both share the gamepad code in `pad-core`.
 
-**Status:** early development (stages 1–3 of [the plan](docs/PLAN.md)).
-Per-application profiles and the tray icon come next.
+**Status:** early development (stages 1–5 of [the plan](docs/PLAN.md), with
+per-application profiles in their first form). Layers and the window
+switcher come next.
 
 ## Default layout
 
@@ -48,17 +49,51 @@ If the right stick acts like buttons 1–4, the pad is in digital mode: press
 its **Analog** button (LED red). desk-pad notices this on DragonRise pads and
 ignores buttons 1–4 until then.
 
+## Installation
+
+From source (see [Building](#building)), in PowerShell:
+
+```powershell
+.\install.ps1      # builds and copies desk-pad.exe to %LOCALAPPDATA%\Programs\desk-pad
+```
+
+Start `desk-pad.exe`: an icon appears in the notification area (maybe
+behind the ^ arrow). Its menu has **Start with Windows** to start it at
+logon.
+
 ## Usage
 
+desk-pad runs in the background. Its tray icon shows the state:
+
+| Colour | State |
+|---|---|
+| green | active |
+| grey | paused (button 10, or the menu) |
+| red | waiting for a gamepad |
+| amber | the pad is in digital mode: press its Analog button |
+| blue | a passthrough profile is in front (REAPER): nothing is sent |
+
+Click the icon for the menu: pause, reload or open the configuration, open
+the log (`%APPDATA%\desk-pad\desk-pad.log`), start with Windows, quit.
+Configuration errors and other things to act on show as Windows
+notifications.
+
 ```
-desk-pad            run; stop with Ctrl+C
-desk-pad --test     button test: print buttons (with timing), axes, D-pad
-                    and the window in front (program and title); sends nothing
-desk-pad --test --seconds 15
-                    the same, ending by itself after 15 s
+desk-pad            run in the tray
+desk-pad --test     button test in a console: buttons (with timing), axes,
+                    D-pad and the window in front; sends nothing
+desk-pad --console  run in a console instead of the tray (stop with Ctrl+C)
+desk-pad --seconds N
+                    stop after N seconds
 desk-pad --config PATH
                     use another configuration file
 ```
+
+Only one desk-pad runs at a time. Quit it from the tray before a `--test`,
+or it acts on the pad too.
+
+In REAPER, desk-pad sends nothing (`[profiles.reaper]` with
+`passthrough = true`): there [reaper-pad](../reaper-pad) has the pad.
 
 ## Configuration
 
@@ -120,7 +155,10 @@ cargo fmt --all
 ## Development
 
 ```
-src/main.rs        command line, the input loop
+src/main.rs        command line, console or tray
+src/app.rs         the input loop, profiles following the window in front
+src/logging.rs     log to the console and the log file
+src/stop.rs        ending cleanly (keys released first)
 src/router.rs      what the input means: keys, mouse, scroll, pause, test mode
 src/config.rs      configuration file: parsing, validation, defaults
 src/watch.rs       notices when the configuration file was saved
@@ -128,7 +166,8 @@ src/layout.rs      bindings and settings in effect
 config.toml        documented default configuration (embedded into the exe)
 src/action.rs      bindable actions (key:, mouse:, pad:toggle)
 src/keys.rs        key names and chords → Windows virtual-key codes
-src/win/           Win32: SendInput, the window in front, timer, Ctrl+C
+src/win/           Win32: SendInput, the window in front, tray icon,
+                   autostart, console, timer
 ```
 
 `router.rs` is plain Rust with time as a parameter and is unit-tested with

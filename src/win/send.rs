@@ -23,6 +23,31 @@ pub struct SendInputOutput<L: Log> {
     /// Whether the last `SendInput` was refused, so it is reported once
     /// per change, not on every event.
     blocked: bool,
+    /// Keys and mouse buttons sent down and not yet up: released on drop,
+    /// so not even a panic leaves them pressed.
+    down_keys: Vec<Vk>,
+    down_mouse: Vec<MouseButton>,
+}
+
+impl<L: Log> Drop for SendInputOutput<L> {
+    fn drop(&mut self) {
+        for b in std::mem::take(&mut self.down_mouse) {
+            self.mouse_button(b, false);
+        }
+        for k in std::mem::take(&mut self.down_keys).into_iter().rev() {
+            self.key(k, false);
+        }
+    }
+}
+
+fn track<T: PartialEq>(list: &mut Vec<T>, item: T, down: bool) {
+    if down {
+        if !list.contains(&item) {
+            list.push(item);
+        }
+    } else {
+        list.retain(|i| *i != item);
+    }
 }
 
 impl<L: Log> SendInputOutput<L> {
@@ -30,6 +55,8 @@ impl<L: Log> SendInputOutput<L> {
         SendInputOutput {
             log,
             blocked: false,
+            down_keys: Vec::new(),
+            down_mouse: Vec::new(),
         }
     }
 
@@ -79,6 +106,7 @@ impl<L: Log> Log for SendInputOutput<L> {
 
 impl<L: Log> Output for SendInputOutput<L> {
     fn key(&mut self, vk: Vk, down: bool) {
+        track(&mut self.down_keys, vk, down);
         // Scan code with the E0 prefix in the high byte for extended keys
         // (arrows, Insert, Home, Win, …); apps reading either see the key.
         // SAFETY: plain call without pointers.
@@ -102,6 +130,7 @@ impl<L: Log> Output for SendInputOutput<L> {
     }
 
     fn mouse_button(&mut self, button: MouseButton, down: bool) {
+        track(&mut self.down_mouse, button, down);
         let (flags, data) = match (button, down) {
             (MouseButton::Left, true) => (MOUSEEVENTF_LEFTDOWN, 0),
             (MouseButton::Left, false) => (MOUSEEVENTF_LEFTUP, 0),
